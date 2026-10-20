@@ -1,0 +1,6 @@
+{
+  "name": "Speak Bloom",
+  "description": "Bloom's Taxonomy-based English-speaking learning platform with CEFR levels, AI voice conversations, teacher assessments, and strict mastery progression.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

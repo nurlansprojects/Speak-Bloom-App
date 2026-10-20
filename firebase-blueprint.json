@@ -1,0 +1,242 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with role, identity from Google Auth, and learning settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Firebase UID" },
+        "email": { "type": "string", "description": "Google authenticated email" },
+        "displayName": { "type": "string", "description": "Full display name" },
+        "photoURL": { "type": "string", "description": "Google avatar URL" },
+        "role": { "type": "string", "enum": ["student", "teacher", "admin"], "description": "Platform role" },
+        "cefrGoal": { "type": "string", "enum": ["A1", "A2", "B1", "B2", "C1", "C2"], "description": "Target CEFR level" },
+        "createdAt": { "type": "string", "description": "ISO timestamp or server time" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp or server time" }
+      },
+      "required": ["id", "email", "displayName", "role"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Educational course organized by CEFR level and Bloom Taxonomy",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Course identifier" },
+        "teacherId": { "type": "string", "description": "UID of authoring teacher" },
+        "teacherName": { "type": "string", "description": "Teacher display name" },
+        "title": { "type": "string", "description": "Course title" },
+        "description": { "type": "string", "description": "Course overview" },
+        "cefrLevel": { "type": "string", "enum": ["A1", "A2", "B1", "B2", "C1", "C2"], "description": "Target CEFR level" },
+        "targetAudience": { "type": "string", "description": "Intended learners" },
+        "learningOutcomes": { "type": "string", "description": "Course objectives" },
+        "prerequisites": { "type": "string", "description": "Prerequisite knowledge" },
+        "status": { "type": "string", "enum": ["draft", "published", "archived"], "description": "Publish status" },
+        "masteryThreshold": { "type": "number", "description": "Minimum passing percentage (default 75)" },
+        "modulesCount": { "type": "number", "description": "Number of modules" },
+        "lessonsCount": { "type": "number", "description": "Total lessons" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["id", "teacherId", "title", "cefrLevel", "status"]
+    },
+    "Module": {
+      "title": "Module",
+      "description": "Course structural module",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Module ID" },
+        "courseId": { "type": "string", "description": "Parent course ID" },
+        "title": { "type": "string", "description": "Module title" },
+        "description": { "type": "string", "description": "Module description" },
+        "orderIndex": { "type": "number", "description": "Display order" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "courseId", "title", "orderIndex"]
+    },
+    "Topic": {
+      "title": "Topic",
+      "description": "Topic within a module",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Topic ID" },
+        "courseId": { "type": "string", "description": "Course ID" },
+        "moduleId": { "type": "string", "description": "Module ID" },
+        "title": { "type": "string", "description": "Topic title" },
+        "description": { "type": "string", "description": "Topic description" },
+        "orderIndex": { "type": "number", "description": "Order index" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "courseId", "moduleId", "title", "orderIndex"]
+    },
+    "Lesson": {
+      "title": "Lesson",
+      "description": "Individual Bloom-aligned speaking lesson",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Lesson ID" },
+        "courseId": { "type": "string", "description": "Course ID" },
+        "moduleId": { "type": "string", "description": "Module ID" },
+        "topicId": { "type": "string", "description": "Topic ID" },
+        "title": { "type": "string", "description": "Lesson title" },
+        "description": { "type": "string", "description": "Lesson description" },
+        "targetSpeakingOutcome": { "type": "string", "description": "Expected speaking outcome" },
+        "cefrLevel": { "type": "string", "enum": ["A1", "A2", "B1", "B2", "C1", "C2"] },
+        "bloomLevels": { "type": "string", "description": "Comma-separated or list of Bloom levels" },
+        "orderIndex": { "type": "number", "description": "Order sequence" },
+        "requiredMasteryScore": { "type": "number", "description": "Passing score percentage" },
+        "explanation": { "type": "string", "description": "Grammar and speaking guidance" },
+        "vocabularyNotes": { "type": "string", "description": "Key phrases and words" },
+        "sampleAnswer": { "type": "string", "description": "Exemplary answer" },
+        "videoUrl": { "type": "string", "description": "Optional instructional video" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "courseId", "moduleId", "topicId", "title", "orderIndex"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "Speaking or text activity inside a lesson",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Activity ID" },
+        "courseId": { "type": "string", "description": "Course ID" },
+        "lessonId": { "type": "string", "description": "Lesson ID" },
+        "title": { "type": "string", "description": "Activity title" },
+        "instructions": { "type": "string", "description": "Instructions for student" },
+        "bloomLevel": { "type": "string", "enum": ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"] },
+        "cefrLevel": { "type": "string", "enum": ["A1", "A2", "B1", "B2", "C1", "C2"] },
+        "format": { "type": "string", "enum": ["text", "recording", "ai_conversation"], "description": "Mode of practice" },
+        "prompt": { "type": "string", "description": "Core prompt or question" },
+        "expectedResponse": { "type": "string", "description": "Model answer / criteria" },
+        "maxAttempts": { "type": "number", "description": "Max allowed retries" },
+        "orderIndex": { "type": "number", "description": "Order index" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "courseId", "lessonId", "title", "format", "prompt"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Student enrollment in a course",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Enrollment ID" },
+        "studentId": { "type": "string", "description": "Student UID" },
+        "courseId": { "type": "string", "description": "Course ID" },
+        "enrolledAt": { "type": "string", "description": "Enrollment timestamp" },
+        "completedLessonsCount": { "type": "number", "description": "Number of completed lessons" },
+        "status": { "type": "string", "enum": ["active", "completed"] },
+        "lastAccessedAt": { "type": "string", "description": "Last activity timestamp" }
+      },
+      "required": ["id", "studentId", "courseId"]
+    },
+    "Progress": {
+      "title": "Lesson Progress",
+      "description": "Student mastery gate progress for a lesson",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Composite key {studentId}_{lessonId}" },
+        "studentId": { "type": "string", "description": "Student UID" },
+        "courseId": { "type": "string", "description": "Course ID" },
+        "lessonId": { "type": "string", "description": "Lesson ID" },
+        "isUnlocked": { "type": "boolean", "description": "Whether lesson prerequisites are satisfied" },
+        "isCompleted": { "type": "boolean", "description": "Whether mastery threshold was achieved" },
+        "bestScore": { "type": "number", "description": "Highest score achieved (0-100)" },
+        "attemptsCount": { "type": "number", "description": "Number of attempts" },
+        "lastAttemptAt": { "type": "string", "description": "Timestamp of latest attempt" }
+      },
+      "required": ["id", "studentId", "courseId", "lessonId", "isUnlocked", "isCompleted"]
+    },
+    "AssessmentAttempt": {
+      "title": "Assessment Attempt",
+      "description": "Submitted assessment record with rubric scores",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Attempt ID" },
+        "studentId": { "type": "string", "description": "Student UID" },
+        "studentName": { "type": "string", "description": "Student name" },
+        "courseId": { "type": "string", "description": "Course ID" },
+        "lessonId": { "type": "string", "description": "Lesson ID" },
+        "activityId": { "type": "string", "description": "Activity ID" },
+        "format": { "type": "string", "enum": ["text", "recording", "ai_conversation"] },
+        "content": { "type": "string", "description": "User text response or transcription" },
+        "audioData": { "type": "string", "description": "Audio recording base64 or storage reference" },
+        "scoreFluency": { "type": "number", "description": "Score 1-4" },
+        "scoreVocabulary": { "type": "number", "description": "Score 1-4" },
+        "scoreGrammar": { "type": "number", "description": "Score 1-4" },
+        "scorePronunciation": { "type": "number", "description": "Score 1-4" },
+        "scoreCoherence": { "type": "number", "description": "Score 1-4" },
+        "scoreTaskAchievement": { "type": "number", "description": "Score 1-4" },
+        "overallPercentage": { "type": "number", "description": "Percentage (0-100)" },
+        "passed": { "type": "boolean", "description": "Whether passed mastery threshold" },
+        "evaluator": { "type": "string", "enum": ["ai", "teacher"] },
+        "feedback": { "type": "string", "description": "Detailed qualitative feedback" },
+        "teacherComments": { "type": "string", "description": "Teacher manual review note" },
+        "submittedAt": { "type": "string", "description": "Submission timestamp" }
+      },
+      "required": ["id", "studentId", "courseId", "lessonId", "overallPercentage", "passed"]
+    },
+    "TeacherApplication": {
+      "title": "Teacher Application",
+      "description": "Application submitted by a student to become a verified teacher",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Application ID (user UID)" },
+        "userId": { "type": "string", "description": "Applicant UID" },
+        "userEmail": { "type": "string", "description": "Applicant Email" },
+        "userName": { "type": "string", "description": "Applicant Name" },
+        "experience": { "type": "string", "description": "Teaching experience background" },
+        "qualifications": { "type": "string", "description": "TEFL/TESOL/CELTA or degree info" },
+        "statement": { "type": "string", "description": "Reason for applying" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "reviewedBy": { "type": "string", "description": "Admin UID" },
+        "submittedAt": { "type": "string", "description": "Application timestamp" }
+      },
+      "required": ["id", "userId", "userEmail", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile records restricted to self or admin"
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Platform administrator authorization records"
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Courses managed by teachers, readable when published or owned"
+    },
+    "/courses/{courseId}/modules/{moduleId}": {
+      "schema": "Module",
+      "description": "Modules belonging to a course"
+    },
+    "/courses/{courseId}/topics/{topicId}": {
+      "schema": "Topic",
+      "description": "Topics belonging to a module in a course"
+    },
+    "/courses/{courseId}/lessons/{lessonId}": {
+      "schema": "Lesson",
+      "description": "Lessons within a topic and course"
+    },
+    "/courses/{courseId}/activities/{activityId}": {
+      "schema": "Activity",
+      "description": "Practice activities for a lesson"
+    },
+    "/enrollments/{enrollmentId}": {
+      "schema": "Enrollment",
+      "description": "Course enrollments per student"
+    },
+    "/progress/{progressId}": {
+      "schema": "Progress",
+      "description": "Strict mastery gating progress per student and lesson"
+    },
+    "/assessmentAttempts/{attemptId}": {
+      "schema": "AssessmentAttempt",
+      "description": "Submitted assessment evaluations with 6-criterion rubric"
+    },
+    "/teacherApplications/{applicationId}": {
+      "schema": "TeacherApplication",
+      "description": "Teacher access applications"
+    }
+  }
+}

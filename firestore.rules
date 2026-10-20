@@ -1,0 +1,147 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && request.auth.token.email == 'cookingmaxxer@gmail.com' && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (isBootstrappedAdmin() || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function isCourseTeacher(courseId) {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/courses/$(courseId)) &&
+         get(/databases/$(database)/documents/courses/$(courseId)).data.teacherId == request.auth.uid)
+      );
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId && (request.resource.data.role == 'student' || isAdmin());
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (request.auth.uid == userId && request.resource.data.role == resource.data.role)
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Admins Collection
+    match /admins/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Teacher Applications
+    match /teacherApplications/{applicationId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Courses Collection
+    match /courses/{courseId} {
+      allow get: if isSignedIn() && (
+        resource.data.status == 'published' ||
+        resource.data.teacherId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (resource.data.teacherId == request.auth.uid && request.resource.data.teacherId == request.auth.uid)
+      );
+      allow delete: if isSignedIn() && (resource.data.teacherId == request.auth.uid || isAdmin());
+
+      // Course Subcollections
+      match /modules/{moduleId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && (isCourseTeacher(courseId) || isAdmin());
+      }
+
+      match /topics/{topicId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && (isCourseTeacher(courseId) || isAdmin());
+      }
+
+      match /lessons/{lessonId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && (isCourseTeacher(courseId) || isAdmin());
+      }
+
+      match /activities/{activityId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && (isCourseTeacher(courseId) || isAdmin());
+      }
+    }
+
+    // Enrollments
+    match /enrollments/{enrollmentId} {
+      allow get: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isAdmin() ||
+        isCourseTeacher(resource.data.courseId)
+      );
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.studentId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isAdmin() ||
+        isCourseTeacher(resource.data.courseId)
+      );
+      allow delete: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+    }
+
+    // Lesson Progress (Mastery Gates)
+    match /progress/{progressId} {
+      allow get: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isAdmin() ||
+        isCourseTeacher(resource.data.courseId)
+      );
+      allow list: if isSignedIn();
+      allow create, update: if isSignedIn() && (
+        request.resource.data.studentId == request.auth.uid ||
+        isAdmin() ||
+        isCourseTeacher(request.resource.data.courseId)
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Assessment Attempts & Rubrics
+    match /assessmentAttempts/{attemptId} {
+      allow get: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isAdmin() ||
+        isCourseTeacher(resource.data.courseId)
+      );
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.studentId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        isCourseTeacher(resource.data.courseId)
+      );
+      allow delete: if isAdmin();
+    }
+  }
+}
