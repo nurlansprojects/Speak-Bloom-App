@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Course, CEFRLevel, Enrollment } from '../types';
-import { getPublishedCourses, getStudentEnrollments, enrollStudentInCourse } from '../services/courseService';
-import { Search, BookOpen, Check, ArrowRight, Layers, Award } from 'lucide-react';
+import {
+  getPublishedCourses,
+  getStudentEnrollments,
+  enrollStudentInCourse,
+  seedSampleCourseWithUploading,
+} from '../services/courseService';
+import { Search, BookOpen, Check, ArrowRight, Layers, Award, UploadCloud, Sparkles } from 'lucide-react';
 
 interface CourseCatalogProps {
   onSelectCourse: (course: Course) => void;
@@ -55,6 +60,23 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({ onSelectCourse }) 
       console.error(err);
     } finally {
       setEnrollingId(null);
+    }
+  };
+
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeedCourse = async () => {
+    setIsSeeding(true);
+    try {
+      await seedSampleCourseWithUploading(
+        currentUser?.uid || 'instructor_sarah',
+        currentUser?.displayName || 'Prof. Sarah Vance'
+      );
+      await loadCatalog();
+    } catch (err: any) {
+      alert(err.message || 'Failed to load course.');
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -122,9 +144,22 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({ onSelectCourse }) 
           <h3 className="text-base font-bold text-[#16151E]">No courses found</h3>
           <p className="text-xs text-[#716D80] max-w-sm mx-auto leading-relaxed">
             {courses.length === 0
-              ? 'No courses have been published yet by teachers. If you are an instructor or administrator, use the Teaching dashboard to publish the first course!'
+              ? 'No courses have been published yet by teachers. You can create a new course in the Teaching Studio or load our sample B2 curriculum featuring Uploading activities!'
               : 'No courses match your selected CEFR level or search criteria.'}
           </p>
+
+          {courses.length === 0 && (
+            <div className="pt-2">
+              <button
+                onClick={handleSeedCourse}
+                disabled={isSeeding}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#6546D7] hover:bg-[#5235BF] disabled:opacity-50 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+              >
+                <UploadCloud className="w-4 h-4" />
+                <span>{isSeeding ? 'Loading Sample Course...' : 'Load Sample Course with Uploading Activity'}</span>
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

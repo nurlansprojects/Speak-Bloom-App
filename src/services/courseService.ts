@@ -591,3 +591,155 @@ export async function reviewTeacherApplication(
     handleFirestoreError(error, OperationType.UPDATE, `teacherApplications/${applicationId}`);
   }
 }
+
+/* ================= DEMO CURRICULUM SEEDING ================= */
+
+export async function seedSampleCourseWithUploading(
+  teacherId: string,
+  teacherName: string
+): Promise<string> {
+  try {
+    // 1. Create Course
+    const courseRef = doc(collection(db, 'courses'));
+    const courseId = courseRef.id;
+    const newCourse: Course = {
+      id: courseId,
+      teacherId,
+      teacherName: teacherName || 'Prof. Sarah Vance',
+      title: 'Professional English & Executive Presentations',
+      description:
+        'Master formal business discourse, strategic presentations, and professional pitches aligned with CEFR B2 outcomes and Bloom Taxonomy.',
+      cefrLevel: 'B2',
+      targetAudience: 'Professionals, business leaders, and advanced English learners.',
+      learningOutcomes:
+        'Deliver structured persuasive presentations, defend quarterly strategy with precision vocabulary, and prepare executive pitch decks.',
+      status: 'published',
+      masteryThreshold: 75,
+      modulesCount: 1,
+      lessonsCount: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await setDoc(courseRef, newCourse);
+
+    // 2. Create Module
+    const moduleRef = doc(collection(db, 'courses', courseId, 'modules'));
+    const moduleId = moduleRef.id;
+    await setDoc(moduleRef, {
+      id: moduleId,
+      courseId,
+      title: 'Module 1: Workplace Discourse & Persuasion',
+      description: 'Frameworks for high-impact communication and executive decks.',
+      orderIndex: 1,
+      createdAt: new Date().toISOString(),
+    });
+
+    // 3. Create Topic
+    const topicRef = doc(collection(db, 'courses', courseId, 'topics'));
+    const topicId = topicRef.id;
+    await setDoc(topicRef, {
+      id: topicId,
+      courseId,
+      moduleId,
+      title: 'Topic 1: Strategic Pitches & Boardroom Speaking',
+      description: 'Structuring arguments and responding with clarity.',
+      orderIndex: 1,
+      createdAt: new Date().toISOString(),
+    });
+
+    // 4. Create Lesson
+    const lessonRef = doc(collection(db, 'courses', courseId, 'lessons'));
+    const lessonId = lessonRef.id;
+    await setDoc(lessonRef, {
+      id: lessonId,
+      courseId,
+      moduleId,
+      topicId,
+      title: 'Delivering Persuasive Business Presentations',
+      description: 'Apply the Rule of Three and rhetorical signposting in business presentations.',
+      targetSpeakingOutcome:
+        'Deliver a confident 3-minute executive pitch using signposting language and supporting presentation slides.',
+      cefrLevel: 'B2',
+      bloomLevels: ['Create', 'Apply', 'Evaluate'],
+      orderIndex: 1,
+      requiredMasteryScore: 75,
+      explanation:
+        'When presenting to executives or clients, begin with a compelling executive summary. Use clear rhetorical signposts: "First and foremost...", "Turning now to the data...", and "To conclude our findings...". Ensure your slides reinforce your speech rather than duplicate verbatim text.',
+      vocabularyNotes:
+        '• "First and foremost" (discourse marker)\n• "To substantiate this claim..." (evidence introduction)\n• "A pivotal metric in our analysis..." (strategic vocabulary)\n• "Strategic dividend" (business impact)\n• "Moving forward to implementation..." (transition)',
+      sampleAnswer:
+        'Good morning board members. First and foremost, our second-quarter expansion demonstrates a pivotal metric: customer retention has climbed 18 percent. To substantiate this claim, please refer to slide four in our deck. Turning now to implementation, our projected strategic dividend provides substantial leverage for the upcoming fiscal cycle.',
+      createdAt: new Date().toISOString(),
+    });
+
+    // 5. Create Activities
+    // Activity 1: Uploading Activity
+    const actUploadRef = doc(collection(db, 'courses', courseId, 'activities'));
+    const actUploadId = actUploadRef.id;
+    await setDoc(actUploadRef, {
+      id: actUploadId,
+      courseId,
+      lessonId,
+      title: 'Executive Presentation Deck & Recorded Pitch',
+      instructions:
+        'Select and upload your presentation materials. You may submit your slide deck (PPT, PPTX, or PDF), video presentation (MP4), audio rehearsal (MP3), or supporting financial model (XLS, XLSX). Your instructor will evaluate your submission with rubric-based feedback.',
+      bloomLevel: 'Create',
+      cefrLevel: 'B2',
+      format: 'uploading',
+      prompt:
+        'Upload your executive presentation deck (PPTX/PDF) or recorded pitch (MP4/MP3) showcasing structured rhetorical signposts and high-impact vocabulary.',
+      maxAttempts: 3,
+      orderIndex: 1,
+      createdAt: new Date().toISOString(),
+    });
+
+    // Activity 2: Voice Recording Practice
+    const actRecRef = doc(collection(db, 'courses', courseId, 'activities'));
+    const actRecId = actRecRef.id;
+    await setDoc(actRecRef, {
+      id: actRecId,
+      courseId,
+      lessonId,
+      title: 'Executive Summary Spoken Rehearsal',
+      instructions: 'Record your 60-second opening statement using at least two key signposts.',
+      bloomLevel: 'Apply',
+      cefrLevel: 'B2',
+      format: 'recording',
+      prompt:
+        'Speak for 60 seconds delivering your presentation introduction. Incorporate "First and foremost" and "To substantiate this claim...".',
+      maxAttempts: 3,
+      orderIndex: 2,
+      createdAt: new Date().toISOString(),
+    });
+
+    // 6. Create attached Teacher Resource in uploads collection
+    const uploadRef = doc(collection(db, 'uploads'));
+    await setDoc(uploadRef, {
+      id: uploadRef.id,
+      userId: teacherId,
+      userName: teacherName || 'Prof. Sarah Vance',
+      userRole: 'teacher',
+      courseId,
+      lessonId,
+      activityId: actUploadId,
+      scope: 'teacher_resource',
+      title: 'Executive Presentation Framework & Template (PPTX)',
+      instructions: 'Download this reference slide framework to format your pitch submission.',
+      fileName: 'Executive_Presentation_Framework.pptx',
+      fileType: 'presentation',
+      fileExtension: 'pptx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      fileSize: 1024 * 340, // 340 KB
+      fileUrl: 'https://storage.googleapis.com/demo/Executive_Presentation_Framework.pptx',
+      storagePath: `uploads/${teacherId}/${courseId}/${lessonId}/demo_Executive_Presentation_Framework.pptx`,
+      status: 'submitted',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    return courseId;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'courses');
+  }
+}
+

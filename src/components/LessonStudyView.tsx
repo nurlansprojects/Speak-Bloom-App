@@ -13,7 +13,9 @@ import {
   Award,
   Square,
   VolumeX,
+  UploadCloud,
 } from 'lucide-react';
+import { LessonUploadingSection } from './LessonUploadingSection';
 
 interface LessonStudyViewProps {
   course: Course;
@@ -451,6 +453,8 @@ export const LessonStudyView: React.FC<LessonStudyViewProps> = ({
                         ? 'Voice Recording'
                         : act.format === 'ai_conversation'
                         ? 'AI Conversation'
+                        : act.format === 'uploading'
+                        ? 'Uploading'
                         : 'Text Response'}
                     </span>
                   </div>
@@ -466,14 +470,26 @@ export const LessonStudyView: React.FC<LessonStudyViewProps> = ({
                   disabled={!isUnlocked}
                   className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#6546D7] hover:bg-[#5235BF] disabled:opacity-50 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
                 >
-                  <Mic className="w-3.5 h-3.5" />
-                  <span>Start Practice</span>
+                  {act.format === 'uploading' ? (
+                    <>
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>Uploading</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-3.5 h-3.5" />
+                      <span>Start Practice</span>
+                    </>
+                  )}
                 </button>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Lesson-level Uploading Resources & Teacher Materials */}
+      <LessonUploadingSection course={course} lesson={lesson} readOnly={!isUnlocked} />
     </div>
   );
 };

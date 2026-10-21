@@ -11,6 +11,7 @@ import { CourseBuilder } from './components/CourseBuilder';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SpeakingPracticeModal } from './components/SpeakingPracticeModal';
+import { UploadingActivityModal } from './components/UploadingActivityModal';
 import { AssessmentResultModal } from './components/AssessmentResultModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { Course, Lesson, Activity, AssessmentAttempt, LessonProgress } from './types';
@@ -181,15 +182,24 @@ function MainApp() {
         ) : null}
       </main>
 
-      {/* Speaking Practice Modal (Mode A, B, C) */}
+      {/* Speaking Practice / Uploading Activity Modal */}
       {activeActivity && selectedLesson && (
-        <SpeakingPracticeModal
-          lesson={selectedLesson}
-          activity={activeActivity}
-          studentName={userProfile?.displayName || 'Learner'}
-          onComplete={handleAssessmentComplete}
-          onClose={() => setActiveActivity(null)}
-        />
+        activeActivity.format === 'uploading' && selectedCourse ? (
+          <UploadingActivityModal
+            course={selectedCourse}
+            lesson={selectedLesson}
+            activity={activeActivity}
+            onClose={() => setActiveActivity(null)}
+          />
+        ) : (
+          <SpeakingPracticeModal
+            lesson={selectedLesson}
+            activity={activeActivity}
+            studentName={userProfile?.displayName || 'Learner'}
+            onComplete={handleAssessmentComplete}
+            onClose={() => setActiveActivity(null)}
+          />
+        )
       )}
 
       {/* Assessment Rubric Result Modal */}
@@ -221,10 +231,14 @@ function MainApp() {
   );
 }
 
+import { ThemeProvider } from './context/ThemeContext';
+
 export default function App() {
   return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <MainApp />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

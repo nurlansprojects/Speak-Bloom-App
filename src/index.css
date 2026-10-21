@@ -1,13 +1,187 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --bg-main: #FAF9FC;
+    --bg-card: #FFFFFF;
+    --bg-muted: #F4F3F9;
+    --text-primary: #1A1A24;
+    --text-secondary: #6B687B;
+    --border-color: #ECEAF2;
+    --primary: #6546D7;
+  }
+
+  html.dark {
+    --bg-main: #0D0C15;
+    --bg-card: #161424;
+    --bg-muted: #1E1B30;
+    --text-primary: #F3F1FA;
+    --text-secondary: #A39EB8;
+    --border-color: #2B2742;
+    --primary: #7B5CF5;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     color: #1a1a24;
     background-color: #fafafc;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
+
+  html.dark body {
+    color: #F3F1FA;
+    background-color: #0D0C15;
+  }
+}
+
+/* Dark mode comprehensive component styling */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0D0C15 !important;
+  color: #F3F1FA !important;
+}
+
+/* Background surfaces */
+html.dark .bg-white,
+html.dark .bg-white\/85,
+html.dark .bg-white\/95 {
+  background-color: #161424 !important;
+}
+
+html.dark .bg-\[\#FAF9FC\],
+html.dark .bg-\[\#FBFBFC\],
+html.dark .bg-\[\#FAFAFC\],
+html.dark .bg-\[\#F7F6FB\],
+html.dark .bg-\[\#F4F3F9\] {
+  background-color: #0E0D18 !important;
+}
+
+html.dark .bg-\[\#F4F1FD\],
+html.dark .bg-\[\#F1EEFB\],
+html.dark .bg-\[\#ECE8F8\],
+html.dark .bg-\[\#ECEAF6\] {
+  background-color: #211C3B !important;
+}
+
+/* Borders */
+html.dark .border-\[\#ECEAF2\],
+html.dark .border-\[\#E9E8F0\],
+html.dark .border-\[\#EAE8F2\],
+html.dark .border-\[\#ECEAF3\],
+html.dark .border-\[\#E4E1EE\],
+html.dark .border-\[\#E5E3ED\],
+html.dark .border-\[\#D9D6E7\],
+html.dark .border-\[\#D5D2E2\],
+html.dark .border-\[\#DDD7F5\],
+html.dark .border-\[\#DDD9E8\],
+html.dark .border-\[\#E8E6F0\],
+html.dark .border-\[\#E2DFEC\],
+html.dark .border-\[\#E0DDEB\],
+html.dark .border-\[\#F0EEF6\],
+html.dark .border-\[\#F3F1F8\] {
+  border-color: #2B2742 !important;
+}
+
+/* Primary text colors */
+html.dark .text-\[\#16151E\],
+html.dark .text-\[\#181624\],
+html.dark .text-\[\#1E1C2B\],
+html.dark .text-\[\#201D2D\],
+html.dark .text-\[\#22212C\],
+html.dark .text-\[\#2A2737\],
+html.dark .text-\[\#2C293A\],
+html.dark .text-\[\#322F40\],
+html.dark .text-\[\#252232\],
+html.dark .text-\[\#1a1a24\],
+html.dark .text-\[\#1E1E24\] {
+  color: #F4F2FA !important;
+}
+
+/* Secondary & muted text colors */
+html.dark .text-\[\#6C697A\],
+html.dark .text-\[\#6B687B\],
+html.dark .text-\[\#6F6C7E\],
+html.dark .text-\[\#787588\],
+html.dark .text-\[\#7A7789\],
+html.dark .text-\[\#8C899B\],
+html.dark .text-\[\#7E7B8D\],
+html.dark .text-\[\#666375\],
+html.dark .text-\[\#5D5A6E\],
+html.dark .text-\[\#524E60\],
+html.dark .text-\[\#524F60\],
+html.dark .text-\[\#524F62\],
+html.dark .text-\[\#605C70\],
+html.dark .text-\[\#484557\],
+html.dark .text-\[\#716E82\],
+html.dark .text-\[\#706D7E\],
+html.dark .text-\[\#706D7F\],
+html.dark .text-\[\#706D80\],
+html.dark .text-\[\#767385\],
+html.dark .text-\[\#7B788C\],
+html.dark .text-\[\#777488\],
+html.dark .text-\[\#737084\],
+html.dark .text-\[\#7F7C8E\],
+html.dark .text-\[\#888597\],
+html.dark .text-\[\#868394\],
+html.dark .text-\[\#636072\],
+html.dark .text-\[\#636074\],
+html.dark .text-\[\#4F4C5E\],
+html.dark .text-\[\#3B3848\],
+html.dark .text-\[\#3A3748\] {
+  color: #A39FB8 !important;
+}
+
+/* Violet brand accents in dark mode */
+html.dark .text-\[\#6546D7\] {
+  color: #8E73FA !important;
+}
+
+html.dark .bg-\[\#6546D7\] {
+  background-color: #7B5CF5 !important;
+}
+
+html.dark .hover\:bg-\[\#5235BF\]:hover {
+  background-color: #6949EB !important;
+}
+
+/* Inputs, Textareas, and Selects */
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark textarea,
+html.dark select {
+  background-color: #191629 !important;
+  color: #F5F3FA !important;
+  border-color: #2F2B48 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #6C6885 !important;
+}
+
+/* Hover and active states */
+html.dark .hover\:bg-\[\#F3F2F8\]:hover,
+html.dark .hover\:bg-\[\#F2EFFB\]:hover,
+html.dark .hover\:bg-\[\#FAF9FC\]:hover,
+html.dark .hover\:bg-\[\#F0EEF8\]:hover,
+html.dark .hover\:bg-\[\#F0EEF7\]:hover,
+html.dark .hover\:bg-white:hover {
+  background-color: #221E38 !important;
+}
+
+/* Header & navigation in dark mode */
+html.dark header {
+  background-color: rgba(22, 20, 36, 0.88) !important;
+  border-color: #2B2742 !important;
+}
+
+html.dark header nav {
+  background-color: #100F1D !important;
+  border-color: #27233D !important;
 }
 
 /* Custom minimal scrollbar */
@@ -24,4 +198,11 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(101, 70, 215, 0.4);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(123, 92, 245, 0.5);
 }

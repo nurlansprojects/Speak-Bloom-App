@@ -16,8 +16,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Bootstrapped administrator email
-const BOOTSTRAP_ADMIN_EMAIL = 'cookingmaxxer@gmail.com';
+// Bootstrapped administrator emails
+const BOOTSTRAP_ADMIN_EMAILS = ['cookingmaxxer@gmail.com', 'nurlandigital@gmail.com'];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userRef = doc(db, 'users', user.uid);
       const userSnap = await getDoc(userRef);
 
-      const isBootstrappedAdmin = user.email === BOOTSTRAP_ADMIN_EMAIL;
+      const isBootstrappedAdmin = !!user.email && BOOTSTRAP_ADMIN_EMAILS.includes(user.email.toLowerCase());
 
       if (userSnap.exists()) {
         const data = userSnap.data() as UserProfile;

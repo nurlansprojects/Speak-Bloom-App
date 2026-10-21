@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme, Theme } from '../context/ThemeContext';
 import { submitTeacherApplication } from '../services/courseService';
 import {
   X,
@@ -10,6 +11,9 @@ import {
   LogOut,
   Send,
   CheckCircle2,
+  Sun,
+  Moon,
+  Laptop,
 } from 'lucide-react';
 
 interface UserProfileModalProps {
@@ -18,6 +22,7 @@ interface UserProfileModalProps {
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
   const { userProfile, currentUser, logout, refreshProfile } = useAuth();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   // Teacher Application state
   const [showTeacherApp, setShowTeacherApp] = useState(false);
@@ -103,6 +108,54 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) =
                 <span>Joined {new Date(userProfile.createdAt).toLocaleDateString()}</span>
               </div>
             )}
+          </div>
+
+          {/* Interface Theme Preference */}
+          <div className="p-4 rounded-2xl bg-[#FAF9FC] border border-[#ECEAF2] space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#16151E]">Appearance Theme</span>
+              <span className="text-[11px] font-semibold text-[#6546D7] uppercase tracking-wider">
+                {theme}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  theme === 'light'
+                    ? 'bg-white border-[#6546D7] text-[#6546D7] shadow-xs'
+                    : 'bg-white/60 border-[#E2DFEC] text-[#5A5769] hover:bg-white'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5" />
+                <span>Light</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  theme === 'dark'
+                    ? 'bg-[#1D1A30] border-[#7B5CF5] text-[#8E73FA] shadow-xs'
+                    : 'bg-white/60 border-[#E2DFEC] text-[#5A5769] hover:bg-white'
+                }`}
+              >
+                <Moon className="w-3.5 h-3.5" />
+                <span>Dark</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme('system')}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  theme === 'system'
+                    ? 'bg-white border-[#6546D7] text-[#6546D7] shadow-xs'
+                    : 'bg-white/60 border-[#E2DFEC] text-[#5A5769] hover:bg-white'
+                }`}
+              >
+                <Laptop className="w-3.5 h-3.5" />
+                <span>System</span>
+              </button>
+            </div>
           </div>
 
           {/* Teacher Application Section for students */}

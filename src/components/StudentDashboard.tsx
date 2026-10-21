@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Course, Enrollment, AssessmentAttempt } from '../types';
+import { Course, Enrollment, AssessmentAttempt, UploadedFileRecord } from '../types';
 import {
   getStudentEnrollments,
   getCourseById,
   getStudentAssessmentAttempts,
 } from '../services/courseService';
+import { getStudentAllSubmissions, formatFileSize } from '../services/uploadStorageService';
 import {
   BookOpen,
   ArrowRight,
@@ -14,6 +15,15 @@ import {
   History,
   TrendingUp,
   Compass,
+  UploadCloud,
+  File,
+  FileText,
+  Film,
+  Music,
+  FileSpreadsheet,
+  Presentation,
+  Download,
+  MessageSquare,
 } from 'lucide-react';
 
 interface StudentDashboardProps {
@@ -35,6 +45,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const { userProfile, currentUser } = useAuth();
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourseCard[]>([]);
   const [recentAttempts, setRecentAttempts] = useState<AssessmentAttempt[]>([]);
+  const [uploadSubmissions, setUploadSubmissions] = useState<UploadedFileRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,9 +68,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       setEnrolledCourses(resolved);
 
       const attempts = await getStudentAssessmentAttempts(currentUser.uid);
-      // Sort by submittedAt descending
       attempts.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
       setRecentAttempts(attempts);
+
+      // Load Uploading activity submissions
+      const myUploads = await getStudentAllSubmissions(currentUser.uid);
+      setUploadSubmissions(myUploads);
     } catch (err) {
       console.error(err);
     } finally {
@@ -268,6 +282,103 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Uploading Coursework & Submissions */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#181624] flex items-center gap-2">
+            <UploadCloud className="w-5 h-5 text-[#6546D7]" />
+            <span>My Uploading Submissions</span>
+          </h2>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#F1EEFB] text-[#6546D7]">
+            {uploadSubmissions.length} {uploadSubmissions.length === 1 ? 'file' : 'files'}
+          </span>
+        </div>
+
+        {uploadSubmissions.length === 0 ? (
+          <div className="bg-white rounded-3xl p-6 text-center border border-[#ECEAF2]">
+            <p className="text-xs text-[#747183]">No files submitted for Uploading activities yet.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl border border-[#ECEAF2] shadow-xs overflow-hidden">
+            <div className="divide-y divide-[#ECEAF2]">
+              {uploadSubmissions.map((sub) => {
+                const getFileIcon = (type: string, ext: string) => {
+                  switch (type) {
+                    case 'audio':
+                      return <Music className="w-4 h-4 text-purple-600" />;
+                    case 'video':
+                      return <Film className="w-4 h-4 text-rose-600" />;
+                    case 'spreadsheet':
+                      return <FileSpreadsheet className="w-4 h-4 text-emerald-600" />;
+                    case 'presentation':
+                      return <Presentation className="w-4 h-4 text-amber-600" />;
+                    case 'document':
+                    default:
+                      if (ext === 'pdf') return <FileText className="w-4 h-4 text-rose-500" />;
+                      return <File className="w-4 h-4 text-blue-600" />;
+                  }
+                };
+
+                return (
+                  <div
+                    key={sub.id}
+                    className="p-5 hover:bg-[#FAF9FC] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className="p-2.5 rounded-xl bg-[#FAF9FC] border border-[#ECEAF2] shrink-0 mt-0.5">
+                        {getFileIcon(sub.fileType, sub.fileExtension)}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-[#181624]">{sub.title || sub.fileName}</span>
+                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-[#FAF9FC] border border-[#ECEAF2] text-[#625F72]">
+                            .{sub.fileExtension.toUpperCase()}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                              sub.status === 'reviewed'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}
+                          >
+                            {sub.status === 'reviewed' ? 'Reviewed by Teacher' : 'Submitted'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#726E80]">
+                          {sub.fileName} • {formatFileSize(sub.fileSize)} • Submitted{' '}
+                          {new Date(sub.createdAt).toLocaleDateString()}
+                        </p>
+                        {sub.feedback && (
+                          <div className="p-2.5 rounded-xl bg-[#F4F1FD] border border-[#DDD7F5] text-xs text-[#322F40] mt-1.5">
+                            <span className="font-bold text-[#6546D7]">Teacher Feedback: </span>
+                            {sub.feedback}
+                            {sub.grade !== undefined && sub.grade !== null && (
+                              <span className="ml-2 font-bold text-emerald-700">
+                                (Score: {sub.grade}/100)
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <a
+                      href={sub.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FAF9FD] hover:bg-[#F2EFFC] text-[#6546D7] border border-[#6546D7]/20 text-xs font-semibold self-start sm:self-auto cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download</span>
+                    </a>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

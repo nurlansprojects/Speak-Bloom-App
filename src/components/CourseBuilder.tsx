@@ -34,6 +34,7 @@ import {
   Edit3,
   Trash2,
   X,
+  UploadCloud,
 } from 'lucide-react';
 
 interface CourseBuilderProps {
@@ -760,8 +761,8 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
                                             <div className="flex items-center gap-2 truncate pr-2">
                                               <span className="w-1.5 h-1.5 rounded-full bg-[#6546D7] shrink-0" />
                                               <span className="font-semibold">{act.title}</span>
-                                              <span className="text-[#898696] text-[11px] uppercase">
-                                                ({act.format})
+                                              <span className="text-[#898696] text-[11px] font-semibold">
+                                                ({act.format === 'uploading' ? 'Uploading' : act.format.toUpperCase()})
                                               </span>
                                             </div>
                                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white border border-[#E0DDEB] text-[#6546D7] shrink-0">
@@ -1012,7 +1013,13 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
                   <option value="recording">Voice Recording (Rubric Evaluated)</option>
                   <option value="ai_conversation">Interactive AI Speaking Partner</option>
                   <option value="text">Text Response Preparation</option>
+                  <option value="uploading">Uploading (Files, Audio, Video & Coursework)</option>
                 </select>
+                {activityFormat === 'uploading' && (
+                  <p className="text-[11px] text-[#6546D7] bg-[#F4F1FD] p-2 rounded-lg border border-[#DDD7F5]">
+                    Supports MP3, MP4, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX. Students and teachers can submit files with progress tracking, error retries, and teacher evaluations.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">

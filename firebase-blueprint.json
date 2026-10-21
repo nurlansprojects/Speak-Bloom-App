@@ -191,6 +191,39 @@
         "submittedAt": { "type": "string", "description": "Application timestamp" }
       },
       "required": ["id", "userId", "userEmail", "status"]
+    },
+    "UploadedFile": {
+      "title": "Uploaded File",
+      "description": "Uploaded course materials or student submissions in MP3, MP4, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX formats",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Upload identifier" },
+        "userId": { "type": "string", "description": "UID of uploader" },
+        "userName": { "type": "string", "description": "Display name of uploader" },
+        "userRole": { "type": "string", "enum": ["student", "teacher", "admin"] },
+        "courseId": { "type": "string", "description": "Associated course ID" },
+        "lessonId": { "type": "string", "description": "Associated lesson ID" },
+        "activityId": { "type": "string", "description": "Associated activity ID" },
+        "scope": { "type": "string", "enum": ["teacher_resource", "student_submission"], "description": "Type of upload" },
+        "title": { "type": "string", "description": "File or activity title" },
+        "instructions": { "type": "string", "description": "Instructions or notes" },
+        "fileName": { "type": "string", "description": "Original file name" },
+        "fileType": { "type": "string", "enum": ["audio", "video", "document", "spreadsheet", "presentation"] },
+        "fileExtension": { "type": "string", "description": "File extension lowercase" },
+        "mimeType": { "type": "string", "description": "MIME type" },
+        "fileSize": { "type": "number", "description": "File size in bytes" },
+        "fileUrl": { "type": "string", "description": "Download or preview URL" },
+        "storagePath": { "type": "string", "description": "Storage location path" },
+        "status": { "type": "string", "enum": ["submitted", "reviewed", "pending"] },
+        "feedback": { "type": "string", "description": "Teacher feedback note" },
+        "grade": { "type": "number", "description": "Optional score (0-100)" },
+        "reviewedBy": { "type": "string", "description": "Reviewer UID" },
+        "reviewedByName": { "type": "string", "description": "Reviewer display name" },
+        "reviewedAt": { "type": "string", "description": "Review timestamp" },
+        "createdAt": { "type": "string", "description": "Upload timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["id", "userId", "courseId", "scope", "fileName", "fileType", "fileExtension", "fileUrl"]
     }
   },
   "firestore": {
@@ -237,6 +270,10 @@
     "/teacherApplications/{applicationId}": {
       "schema": "TeacherApplication",
       "description": "Teacher access applications"
+    },
+    "/uploads/{uploadId}": {
+      "schema": "UploadedFile",
+      "description": "Uploaded course materials and student activity submissions"
     }
   }
 }

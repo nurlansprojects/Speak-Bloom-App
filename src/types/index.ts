@@ -10,7 +10,37 @@ export type BloomLevel =
   | 'Evaluate'
   | 'Create';
 
-export type ActivityFormat = 'text' | 'recording' | 'ai_conversation';
+export type ActivityFormat = 'text' | 'recording' | 'ai_conversation' | 'uploading';
+
+export type UploadCategory = 'audio' | 'video' | 'document' | 'spreadsheet' | 'presentation';
+
+export interface UploadedFileRecord {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  courseId: string;
+  lessonId?: string;
+  activityId?: string;
+  scope: 'teacher_resource' | 'student_submission';
+  title: string;
+  instructions?: string;
+  fileName: string;
+  fileType: UploadCategory;
+  fileExtension: string; // mp3, mp4, doc, docx, pdf, xls, xlsx, ppt, pptx
+  mimeType: string;
+  fileSize: number;
+  fileUrl: string;
+  storagePath: string;
+  status: 'submitted' | 'reviewed' | 'pending';
+  feedback?: string;
+  grade?: number; // 0 - 100
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export interface UserProfile {
   id: string;
@@ -92,6 +122,8 @@ export interface Activity {
   expectedResponse?: string;
   maxAttempts: number;
   orderIndex: number;
+  allowedFormats?: string[];
+  resourceFileIds?: string[];
   createdAt?: string;
 }
 

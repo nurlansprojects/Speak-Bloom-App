@@ -13,11 +13,22 @@ service cloud.firestore {
     }
 
     function isBootstrappedAdmin() {
-      return isSignedIn() && request.auth.token.email == 'cookingmaxxer@gmail.com' && request.auth.token.email_verified == true;
+      return isSignedIn() && (
+        (request.auth.token.email == 'cookingmaxxer@gmail.com' && request.auth.token.email_verified == true) ||
+        (request.auth.token.email == 'nurlandigital@gmail.com' && request.auth.token.email_verified == true)
+      );
     }
 
     function isAdmin() {
       return isSignedIn() && (isBootstrappedAdmin() || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isTeacher() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'])
+      );
     }
 
     function isValidId(id) {
@@ -27,9 +38,23 @@ service cloud.firestore {
     function isCourseTeacher(courseId) {
       return isSignedIn() && (
         isAdmin() ||
+        isTeacher() ||
         (exists(/databases/$(database)/documents/courses/$(courseId)) &&
          get(/databases/$(database)/documents/courses/$(courseId)).data.teacherId == request.auth.uid)
       );
+    }
+
+    function isValidUploadedFile(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.userId is string && data.userId == request.auth.uid
+        && data.courseId is string && data.courseId.size() > 0 && data.courseId.size() <= 128
+        && data.scope in ['teacher_resource', 'student_submission']
+        && data.fileName is string && data.fileName.size() > 0 && data.fileName.size() <= 255
+        && data.fileType in ['audio', 'video', 'document', 'spreadsheet', 'presentation']
+        && data.fileExtension in ['mp3', 'mp4', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
+        && data.fileSize is number && data.fileSize > 0 && data.fileSize <= 52428800
+        && data.fileUrl is string && data.fileUrl.size() > 0
+        && data.storagePath is string && data.storagePath.size() > 0;
     }
 
     // Users Collection
@@ -66,10 +91,11 @@ service cloud.firestore {
         isAdmin()
       );
       allow list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
+      allow create: if isSignedIn() && (request.resource.data.teacherId == request.auth.uid || isTeacher() || isAdmin());
       allow update: if isSignedIn() && (
         isAdmin() ||
-        (resource.data.teacherId == request.auth.uid && request.resource.data.teacherId == request.auth.uid)
+        (resource.data.teacherId == request.auth.uid && request.resource.data.teacherId == request.auth.uid) ||
+        isTeacher()
       );
       allow delete: if isSignedIn() && (resource.data.teacherId == request.auth.uid || isAdmin());
 
@@ -142,6 +168,59 @@ service cloud.firestore {
         isCourseTeacher(resource.data.courseId)
       );
       allow delete: if isAdmin();
+    }
+
+    // Uploaded Files (Shared Uploading feature for Teachers and Students)
+    match /uploads/{uploadId} {
+      // Read access:
+      // - Teacher resources can be read by any signed-in student or teacher
+      // - Student private submissions can only be read by the owner, course teacher, or admin
+      allow get: if isSignedIn() && (
+        resource.data.scope == 'teacher_resource' ||
+        resource.data.userId == request.auth.uid ||
+        isCourseTeacher(resource.data.courseId) ||
+        isTeacher() ||
+        isAdmin()
+      );
+      allow list: if isSignedIn();
+
+      // Create access:
+      // - Must be signed in, uploading as themselves (prevent impersonation)
+      // - Must validate schema: required fields, types, 50MB limit, valid extension & category
+      // - If uploading student_submission: authorized for any signed-in student
+      // - If uploading teacher_resource: user must be course teacher, verified teacher, or admin
+      allow create: if isSignedIn() &&
+        isValidUploadedFile(request.resource.data) &&
+        (
+          request.resource.data.scope == 'student_submission' ||
+          (request.resource.data.scope == 'teacher_resource' && (isCourseTeacher(request.resource.data.courseId) || isTeacher() || isAdmin()))
+        );
+
+      // Update access:
+      // - Owner can update their title/instructions/metadata without altering ownership or scope
+      // - Course teacher or Admin can add feedback, grade, and review status to student submissions
+      // - Students CANNOT modify teacher-owned files or submissions belonging to others
+      allow update: if isSignedIn() && (
+        (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.scope == resource.data.scope
+        ) ||
+        (
+          (isCourseTeacher(resource.data.courseId) || isTeacher() || isAdmin()) &&
+          resource.data.scope == 'student_submission' &&
+          request.resource.data.userId == resource.data.userId
+        )
+      );
+
+      // Delete access:
+      // - Students can only delete their own uploads
+      // - Teachers and admins can delete teacher resources for courses or their own files
+      // - Students CANNOT delete teacher-owned files
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.scope == 'teacher_resource' && (isCourseTeacher(resource.data.courseId) || isTeacher() || isAdmin()))
+      );
     }
   }
 }

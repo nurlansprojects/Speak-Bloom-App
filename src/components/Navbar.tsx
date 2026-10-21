@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { SpeakBloomLogo } from './SpeakBloomLogo';
 import {
   BookOpen,
@@ -8,6 +9,8 @@ import {
   ShieldCheck,
   LogOut,
   User as UserIcon,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -18,6 +21,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, onOpenProfile }) => {
   const { userProfile, logout } = useAuth();
+  const { resolvedTheme, toggleTheme } = useTheme();
 
   const isTeacher = userProfile?.role === 'teacher' || userProfile?.role === 'admin';
   const isAdmin = userProfile?.role === 'admin';
@@ -101,6 +105,20 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, onOpe
           <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-[#F1EEFB] text-[#6546D7] border border-[#6546D7]/15">
             {userProfile?.role || 'student'}
           </span>
+
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            title={resolvedTheme === 'dark' ? 'Switch to Light theme' : 'Switch to Dark theme'}
+            aria-label="Toggle theme"
+            className="p-2 rounded-xl text-[#7E7B8D] hover:text-[#6546D7] hover:bg-[#F3F2F8] transition-colors cursor-pointer border border-transparent hover:border-[#E5E3ED]"
+          >
+            {resolvedTheme === 'dark' ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-[#6546D7]" />
+            )}
+          </button>
 
           {/* User Profile Button (Accessible on both Mobile & Desktop) */}
           <button
@@ -190,6 +208,20 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, onOpe
         >
           <UserIcon className="w-4 h-4" />
           <span>Profile</span>
+        </button>
+
+        {/* Mobile Theme Toggle Item */}
+        <button
+          onClick={toggleTheme}
+          className="flex flex-col items-center gap-1 p-1 text-[11px] font-medium text-[#7A7789] hover:text-[#6546D7] transition-colors cursor-pointer"
+          title="Toggle theme"
+        >
+          {resolvedTheme === 'dark' ? (
+            <Sun className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-[#6546D7]" />
+          )}
+          <span>{resolvedTheme === 'dark' ? 'Light' : 'Dark'}</span>
         </button>
       </div>
     </header>
