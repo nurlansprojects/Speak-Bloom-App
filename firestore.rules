@@ -135,7 +135,11 @@ service cloud.firestore {
         isAdmin() ||
         isCourseTeacher(resource.data.courseId)
       );
-      allow delete: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isCourseTeacher(resource.data.courseId) ||
+        isAdmin()
+      );
     }
 
     // Lesson Progress (Mastery Gates)
@@ -151,7 +155,10 @@ service cloud.firestore {
         isAdmin() ||
         isCourseTeacher(request.resource.data.courseId)
       );
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn() && (
+        isCourseTeacher(resource.data.courseId) ||
+        isAdmin()
+      );
     }
 
     // Assessment Attempts & Rubrics
@@ -167,7 +174,10 @@ service cloud.firestore {
         isAdmin() ||
         isCourseTeacher(resource.data.courseId)
       );
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn() && (
+        isCourseTeacher(resource.data.courseId) ||
+        isAdmin()
+      );
     }
 
     // Uploaded Files (Shared Uploading feature for Teachers and Students)
@@ -214,12 +224,15 @@ service cloud.firestore {
       );
 
       // Delete access:
-      // - Students can only delete their own uploads
-      // - Teachers and admins can delete teacher resources for courses or their own files
+      // - Students can delete their own uploads
+      // - Course teacher or admin can delete all uploads belonging to the course during course cleanup
+      // - Teachers and admins can delete teacher resources
       // - Students CANNOT delete teacher-owned files
       allow delete: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
-        (resource.data.scope == 'teacher_resource' && (isCourseTeacher(resource.data.courseId) || isTeacher() || isAdmin()))
+        isCourseTeacher(resource.data.courseId) ||
+        (resource.data.scope == 'teacher_resource' && (isTeacher() || isAdmin())) ||
+        isAdmin()
       );
     }
   }

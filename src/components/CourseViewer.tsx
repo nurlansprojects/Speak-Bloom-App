@@ -5,6 +5,7 @@ import {
   getTopics,
   getLessons,
   getStudentCourseProgress,
+  getCourseById,
 } from '../services/courseService';
 import {
   CheckCircle2,
@@ -14,6 +15,7 @@ import {
   ArrowLeft,
   Award,
   Edit3,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface CourseViewerProps {
@@ -38,6 +40,7 @@ export const CourseViewer: React.FC<CourseViewerProps> = ({
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [progressMap, setProgressMap] = useState<Record<string, LessonProgress>>({});
   const [loading, setLoading] = useState(true);
+  const [isDeleted, setIsDeleted] = useState(false);
 
   useEffect(() => {
     loadCourseContent();
@@ -45,7 +48,16 @@ export const CourseViewer: React.FC<CourseViewerProps> = ({
 
   const loadCourseContent = async () => {
     setLoading(true);
+    setIsDeleted(false);
     try {
+      // 1. Verify that the course document exists and is active
+      const courseDoc = await getCourseById(course.id);
+      if (!courseDoc || (courseDoc as any).deleting) {
+        setIsDeleted(true);
+        setLoading(false);
+        return;
+      }
+
       const [mods, tops, less, progs] = await Promise.all([
         getCourseModules(course.id),
         getTopics(course.id),
@@ -67,6 +79,27 @@ export const CourseViewer: React.FC<CourseViewerProps> = ({
   const totalLessons = lessons.length;
   const completedLessons = lessons.filter((l) => progressMap[l.id]?.isCompleted).length;
   const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+  if (isDeleted) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-4 animate-in fade-in duration-200">
+        <div className="w-14 h-14 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
+          <AlertTriangle className="w-7 h-7" />
+        </div>
+        <h2 className="text-xl font-bold text-[#181624]">Course No Longer Available</h2>
+        <p className="text-xs text-[#6F6C7E] max-w-md mx-auto leading-relaxed">
+          This course has been permanently deleted from the platform by its instructor or an administrator. All associated modules, lessons, and access permissions have been removed.
+        </p>
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#6546D7] hover:bg-[#5235BF] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Return to Dashboard</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-200">

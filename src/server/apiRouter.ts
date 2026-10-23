@@ -303,6 +303,137 @@ router.post('/ai/tts', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/courses/:courseId
+ * Server-authoritative course deletion endpoint
+ * Verifies authenticated caller identity, validates course ownership or admin privileges,
+ * and purges stored files on server disk.
+ */
+router.delete('/courses/:courseId', async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    if (!courseId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Course ID is required.' },
+      });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Bearer authentication token is required.' },
+      });
+    }
+
+    const idToken = authHeader.split('Bearer ')[1].trim();
+
+    // Read project config
+    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+    let fbConfig: any = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        fbConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      } catch (err) {
+        console.error('Failed reading firebase config in server:', err);
+      }
+    }
+
+    const apiKey = fbConfig.apiKey || process.env.VITE_FIREBASE_API_KEY || 'AIzaSyAUCiXkqVEmvFYXm_lIR1DG5keQOQyIKOs';
+    const projectId = fbConfig.projectId || 'gen-lang-client-0382135068';
+    const databaseId = fbConfig.firestoreDatabaseId || 'ai-studio-97c4ed04-a739-49b6-b197-5c944b301cde';
+
+    // Verify token with Firebase REST API (Identity Toolkit)
+    const verifyResp = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      }
+    );
+
+    if (!verifyResp.ok) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired Firebase authentication token.' },
+      });
+    }
+
+    const verifyData = await verifyResp.json();
+    const user = verifyData.users?.[0];
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: 'User record not found for provided token.' },
+      });
+    }
+
+    const uid = user.localId;
+    const email = (user.email || '').toLowerCase();
+    const isAdmin =
+      email === 'cookingmaxxer@gmail.com' ||
+      email === 'nurlandigital@gmail.com';
+
+    // Verify course ownership or admin authorization via Firestore REST API using the user's token
+    const firestoreCourseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/courses/${courseId}`;
+    const getCourseResp = await fetch(firestoreCourseUrl, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+
+    if (getCourseResp.ok) {
+      const courseDoc = await getCourseResp.json();
+      const teacherId = courseDoc.fields?.teacherId?.stringValue;
+      if (!isAdmin && teacherId && teacherId !== uid) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'You are not authorized to delete this course. Only the owning instructor or an administrator can delete it.',
+          },
+        });
+      }
+    } else if (getCourseResp.status !== 404 && getCourseResp.status !== 403) {
+      console.warn('Firestore course check returned status:', getCourseResp.status);
+    }
+
+    // Clean up any files on disk in uploads directory that are tagged with or reference this course
+    try {
+      if (fs.existsSync(UPLOAD_DIR)) {
+        const files = fs.readdirSync(UPLOAD_DIR);
+        for (const file of files) {
+          if (file.includes(courseId)) {
+            try {
+              fs.unlinkSync(path.join(UPLOAD_DIR, file));
+            } catch (unlinkErr) {
+              console.warn(`Could not delete course file ${file}:`, unlinkErr);
+            }
+          }
+        }
+      }
+    } catch (fsErr) {
+      console.warn('Error during disk files purge:', fsErr);
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        courseId,
+        purgedBy: uid,
+        timestamp: new Date().toISOString(),
+      },
+      message: 'Course and related assets permanently deleted from platform.',
+    });
+  } catch (err: any) {
+    console.error('API DELETE /courses/:courseId error:', err);
+    return res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: err?.message || 'Failed to process course deletion.' },
+    });
+  }
+});
+
 // Catch-all for undefined /api routes: Return JSON 404, never HTML!
 router.use('*', (_req, res) => {
   res.status(404).json({

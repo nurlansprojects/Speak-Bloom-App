@@ -5,12 +5,14 @@ import {
   getTeacherCourses,
   getCourseSubmissionsForTeacher,
   teacherReviewAssessment,
+  deleteCourseGlobally,
 } from '../services/courseService';
 import {
   getCourseSubmissionsForTeacherUploads,
   teacherReviewSubmission,
   formatFileSize,
 } from '../services/uploadStorageService';
+import { DeleteCourseModal } from './DeleteCourseModal';
 import {
   Plus,
   BookOpen,
@@ -31,6 +33,8 @@ import {
   Download,
   ExternalLink,
   X,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -60,6 +64,44 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
   const [submissionsTab, setSubmissionsTab] = useState<'uploading' | 'speaking'>('uploading');
   const [loading, setLoading] = useState(true);
+
+  // Global course deletion state
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
+  const [isDeletingCourse, setIsDeletingCourse] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccessMessage, setDeleteSuccessMessage] = useState<string | null>(null);
+
+  const canDeleteCourse = (course: Course) => {
+    if (!currentUser) return false;
+    const isOwner = course.teacherId === currentUser.uid;
+    const isAdmin =
+      userProfile?.role === 'admin' ||
+      userProfile?.email?.toLowerCase() === 'cookingmaxxer@gmail.com' ||
+      userProfile?.email?.toLowerCase() === 'nurlandigital@gmail.com';
+    return isOwner || isAdmin;
+  };
+
+  const handleConfirmDeleteCourse = async (course: Course) => {
+    setIsDeletingCourse(true);
+    setDeleteError(null);
+    try {
+      await deleteCourseGlobally(course.id);
+      // Immediately remove from local state
+      setCourses((prev) => prev.filter((c) => c.id !== course.id));
+      setDeleteSuccessMessage(
+        `Course "${course.title}" and all associated modules, lessons, and learning assets were permanently deleted.`
+      );
+      setCourseToDelete(null);
+      setTimeout(() => {
+        setDeleteSuccessMessage(null);
+      }, 7000);
+    } catch (err: any) {
+      console.error('Course deletion failed:', err);
+      setDeleteError(err.message || 'Failed to delete course. Please retry.');
+    } finally {
+      setIsDeletingCourse(false);
+    }
+  };
 
   useEffect(() => {
     if (currentUser) {
@@ -214,10 +256,28 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
       {/* Courses List */}
       <div className="space-y-4">
-        <h2 className="text-lg font-bold text-[#181624] flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-[#6546D7]" />
-          <span>My Authored Courses</span>
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#181624] flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-[#6546D7]" />
+            <span>My Authored Courses</span>
+          </h2>
+        </div>
+
+        {/* Success Alert Banner */}
+        {deleteSuccessMessage && (
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{deleteSuccessMessage}</span>
+            </div>
+            <button
+              onClick={() => setDeleteSuccessMessage(null)}
+              className="text-emerald-700 hover:text-emerald-950 p-1 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="py-12 flex justify-center">
@@ -278,7 +338,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-[#F2EFF7] flex items-center justify-end gap-2">
+                <div className="pt-3 border-t border-[#F2EFF7] flex flex-wrap items-center justify-end gap-2">
                   <button
                     onClick={() => onPreviewCourse(course)}
                     className="px-3.5 py-2 rounded-xl border border-[#D8D5E5] text-xs font-medium text-[#4B485A] hover:bg-[#FAF9FC] transition-colors cursor-pointer"
@@ -292,6 +352,19 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Edit Curriculum</span>
                   </button>
+                  {canDeleteCourse(course) && (
+                    <button
+                      onClick={() => {
+                        setDeleteError(null);
+                        setCourseToDelete(course);
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 hover:border-rose-300 text-xs font-semibold transition-colors cursor-pointer"
+                      title="Delete Course permanently"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Course</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -647,6 +720,21 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Course Deletion Confirmation Dialog */}
+      <DeleteCourseModal
+        course={courseToDelete}
+        isOpen={!!courseToDelete}
+        onClose={() => {
+          if (!isDeletingCourse) {
+            setCourseToDelete(null);
+            setDeleteError(null);
+          }
+        }}
+        onConfirmDelete={handleConfirmDeleteCourse}
+        isDeleting={isDeletingCourse}
+        error={deleteError}
+      />
     </div>
   );
 };

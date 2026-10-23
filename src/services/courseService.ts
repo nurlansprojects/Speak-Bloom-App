@@ -9,8 +9,10 @@ import {
   query,
   where,
   orderBy,
+  writeBatch,
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { ref, deleteObject } from 'firebase/storage';
+import { db, storage, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import {
   Course,
   Module,
@@ -90,13 +92,180 @@ export async function updateCourse(courseId: string, updates: Partial<Course>): 
   }
 }
 
-export async function deleteCourse(courseId: string): Promise<void> {
+/**
+ * Complete, secure global course deletion
+ * Cleans up:
+ * 1. Storage files (server disk uploads & Firebase Storage)
+ * 2. Upload records in `uploads` collection
+ * 3. Subcollections: `activities`, `lessons`, `topics`, `modules`
+ * 4. Enrollments in `enrollments` collection
+ * 5. Lesson progress in `progress` collection
+ * 6. Assessment attempts in `assessmentAttempts` collection
+ * 7. Parent course document in `courses` collection
+ * 8. Backend server confirmation via DELETE /api/courses/:courseId
+ */
+export async function deleteCourseGlobally(courseId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Authentication required: You must be signed in to delete a course.');
+  }
+
+  // 1. Fetch course to verify existence and check authorization
+  const courseRef = doc(db, 'courses', courseId);
+  const courseSnap = await getDoc(courseRef);
+  if (!courseSnap.exists()) {
+    // Course does not exist or has already been removed
+    return;
+  }
+
+  const courseData = courseSnap.data() as Course;
+  const isBootstrapAdmin =
+    user.email?.toLowerCase() === 'cookingmaxxer@gmail.com' ||
+    user.email?.toLowerCase() === 'nurlandigital@gmail.com';
+
+  let isDbAdmin = false;
   try {
-    const courseRef = doc(db, 'courses', courseId);
+    const adminSnap = await getDoc(doc(db, 'admins', user.uid));
+    isDbAdmin = adminSnap.exists();
+  } catch {
+    // Ignore read failure if admin collection is restricted
+  }
+
+  const isCourseOwner = courseData.teacherId === user.uid;
+  if (!isCourseOwner && !isBootstrapAdmin && !isDbAdmin) {
+    throw new Error(
+      'Permission denied: Only the owning instructor or an administrator can delete this course.'
+    );
+  }
+
+  // 2. Mark course as 'archived' & 'deleting' in Firestore so all connected clients immediately block interaction
+  try {
+    await updateDoc(courseRef, {
+      status: 'archived',
+      deleting: true,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (markErr) {
+    console.warn('Could not set pre-deletion status flag on course:', markErr);
+  }
+
+  // 3. Purge uploaded files and media associated with this course
+  try {
+    const uploadsRef = collection(db, 'uploads');
+    const uploadsQuery = query(uploadsRef, where('courseId', '==', courseId));
+    const uploadsSnap = await getDocs(uploadsQuery);
+
+    for (const uploadDoc of uploadsSnap.docs) {
+      const uData = uploadDoc.data();
+      // Remove disk file if server-stored
+      if (uData.storagePath && typeof uData.storagePath === 'string') {
+        if (uData.storagePath.startsWith('server://uploads/')) {
+          const fname = uData.storagePath.replace('server://uploads/', '');
+          try {
+            await fetch(`/api/storage/files/${encodeURIComponent(fname)}`, { method: 'DELETE' });
+          } catch (delErr) {
+            console.warn('Could not remove server file:', delErr);
+          }
+        } else if (!uData.storagePath.startsWith('idb://')) {
+          try {
+            const storageRef = ref(storage, uData.storagePath);
+            await deleteObject(storageRef);
+          } catch (delErr) {
+            console.warn('Could not remove cloud storage object:', delErr);
+          }
+        }
+      }
+      // Delete upload record from Firestore
+      await deleteDoc(uploadDoc.ref);
+    }
+  } catch (err) {
+    console.warn('Error purging course uploads:', err);
+  }
+
+  // 4. Clean up subcollections inside course document (activities, lessons, topics, modules)
+  // Must be deleted BEFORE the course document itself so isCourseTeacher(courseId) evaluates correctly
+  const subcollections = ['activities', 'lessons', 'topics', 'modules'];
+  for (const subName of subcollections) {
+    try {
+      const subRef = collection(db, 'courses', courseId, subName);
+      const subSnap = await getDocs(subRef);
+      if (!subSnap.empty) {
+        const batch = writeBatch(db);
+        subSnap.docs.forEach((docItem) => batch.delete(docItem.ref));
+        await batch.commit();
+      }
+    } catch (subErr) {
+      console.warn(`Error deleting subcollection ${subName}:`, subErr);
+    }
+  }
+
+  // 5. Clean up related top-level collection records: enrollments, progress, assessmentAttempts
+  // Enrollments
+  try {
+    const enrollmentsRef = collection(db, 'enrollments');
+    const enrollmentsSnap = await getDocs(query(enrollmentsRef, where('courseId', '==', courseId)));
+    if (!enrollmentsSnap.empty) {
+      const batch = writeBatch(db);
+      enrollmentsSnap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  } catch (enrErr) {
+    console.warn('Error cleaning up course enrollments:', enrErr);
+  }
+
+  // Lesson Progress
+  try {
+    const progressRef = collection(db, 'progress');
+    const progressSnap = await getDocs(query(progressRef, where('courseId', '==', courseId)));
+    if (!progressSnap.empty) {
+      const batch = writeBatch(db);
+      progressSnap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  } catch (progErr) {
+    console.warn('Error cleaning up course progress:', progErr);
+  }
+
+  // Assessment Attempts
+  try {
+    const attemptsRef = collection(db, 'assessmentAttempts');
+    const attemptsSnap = await getDocs(query(attemptsRef, where('courseId', '==', courseId)));
+    if (!attemptsSnap.empty) {
+      const batch = writeBatch(db);
+      attemptsSnap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  } catch (attErr) {
+    console.warn('Error cleaning up course assessment attempts:', attErr);
+  }
+
+  // 6. Delete the parent course document in Firestore
+  try {
     await deleteDoc(courseRef);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `courses/${courseId}`);
   }
+
+  // 7. Notify backend server for server-side disk purge and verification
+  try {
+    const idToken = await user.getIdToken();
+    const resp = await fetch(`/api/courses/${encodeURIComponent(courseId)}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      console.warn('Backend server returned non-OK during course delete:', errData);
+    }
+  } catch (backendErr) {
+    console.warn('Backend endpoint call warning:', backendErr);
+  }
+}
+
+export async function deleteCourse(courseId: string): Promise<void> {
+  return deleteCourseGlobally(courseId);
 }
 
 /* ================= MODULE, TOPIC, LESSON, ACTIVITY ================= */
