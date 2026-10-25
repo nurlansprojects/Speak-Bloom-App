@@ -283,15 +283,18 @@ export async function transcribeAudio(audioBase64: string, mimeType: string = 'a
     throw new Error('Gemini API key is not configured on the server.');
   }
 
+  // Strip parameters like ';codecs=opus' to provide valid IANA MIME type for Gemini
+  const cleanMime = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
+
   const audioPart = {
     inlineData: {
-      mimeType,
+      mimeType: cleanMime,
       data: audioBase64,
     },
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const aiPromise = ai.models.generateContent({
       model: 'gemini-3.5-transcribe',
       contents: {
         parts: [
@@ -303,7 +306,13 @@ export async function transcribeAudio(audioBase64: string, mimeType: string = 'a
       },
     });
 
-    if (response.text && response.text.trim().length > 0) {
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), 8000)
+    );
+
+    const response: any = await Promise.race([aiPromise, timeoutPromise]);
+
+    if (response?.text && response.text.trim().length > 0) {
       return {
         transcript: response.text.trim(),
       };
@@ -313,7 +322,7 @@ export async function transcribeAudio(audioBase64: string, mimeType: string = 'a
   }
 
   try {
-    const fallbackResponse = await ai.models.generateContent({
+    const fallbackAiPromise = ai.models.generateContent({
       model: 'gemini-3.8-flash',
       contents: {
         parts: [
@@ -325,15 +334,24 @@ export async function transcribeAudio(audioBase64: string, mimeType: string = 'a
       },
     });
 
-    return {
-      transcript: (fallbackResponse.text || '').trim(),
-    };
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), 6000)
+    );
+
+    const fallbackResponse: any = await Promise.race([fallbackAiPromise, timeoutPromise]);
+
+    if (fallbackResponse?.text && fallbackResponse.text.trim().length > 0) {
+      return {
+        transcript: fallbackResponse.text.trim(),
+      };
+    }
   } catch (err2) {
     console.warn('transcribeAudio fallback error:', err2);
-    return {
-      transcript: 'Spoken English response',
-    };
   }
+
+  return {
+    transcript: '',
+  };
 }
 
 /**

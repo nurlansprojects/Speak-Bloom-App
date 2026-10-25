@@ -9,6 +9,7 @@ import {
   deleteUploadRecord,
   getUploadsForActivity,
   getStudentSubmissionsForActivity,
+  getTeacherUploadsForLesson,
   teacherReviewSubmission,
   ALL_ALLOWED_EXTENSIONS,
 } from '../services/uploadStorageService';
@@ -20,6 +21,7 @@ import {
   Music,
   FileSpreadsheet,
   Presentation,
+  Image as ImageIcon,
   CheckCircle2,
   AlertCircle,
   X,
@@ -114,20 +116,20 @@ export const UploadingActivityModal: React.FC<UploadingActivityModalProps> = ({
     if (!currentUser) return;
     setLoadingRecords(true);
     try {
-      // 1. Load activity uploads
-      const allActivityUploads = await getUploadsForActivity(course.id, activity.id);
-
-      // Separate into teacher resources and student submissions
-      const resources = allActivityUploads.filter((u) => u.scope === 'teacher_resource');
-      setTeacherResources(resources);
-
       if (isTeacher) {
-        // Teacher sees all student submissions for this activity
+        // Teacher sees all teacher resources and student submissions for this activity
+        const allActivityUploads = await getUploadsForActivity(course.id, activity.id);
+        const resources = allActivityUploads.filter((u) => u.scope === 'teacher_resource');
         const studentSubs = allActivityUploads.filter((u) => u.scope === 'student_submission');
+        setTeacherResources(resources);
         setAllStudentSubmissions(studentSubs);
+      } else {
+        // Student sees teacher materials for lesson/activity, but ONLY their own private submissions
+        const lessonResources = await getTeacherUploadsForLesson(course.id, lesson.id);
+        setTeacherResources(lessonResources);
       }
 
-      // Student sees their own uploads
+      // Load student's own submissions
       const myOwn = await getStudentSubmissionsForActivity(course.id, activity.id, currentUser.uid);
       setMySubmissions(myOwn);
     } catch (err: any) {
@@ -140,6 +142,8 @@ export const UploadingActivityModal: React.FC<UploadingActivityModalProps> = ({
   // Helper to get file type icon
   const getFileIcon = (fileType: string, extension: string) => {
     switch (fileType) {
+      case 'image':
+        return <ImageIcon className="w-5 h-5 text-emerald-600" />;
       case 'audio':
         return <Music className="w-5 h-5 text-purple-600" />;
       case 'video':
@@ -271,6 +275,7 @@ export const UploadingActivityModal: React.FC<UploadingActivityModalProps> = ({
             item.file,
             course.id,
             lesson.id,
+            activity.id,
             {
               signal: controller.signal,
               onProgress: (percent, transferred, total) => {

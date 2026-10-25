@@ -12,11 +12,13 @@ export type BloomLevel =
 
 export type ActivityFormat = 'text' | 'recording' | 'ai_conversation' | 'uploading';
 
-export type UploadCategory = 'audio' | 'video' | 'document' | 'spreadsheet' | 'presentation';
+export type UploadCategory = 'audio' | 'video' | 'document' | 'spreadsheet' | 'presentation' | 'image';
 
 export interface UploadedFileRecord {
   id: string;
   userId: string;
+  studentId?: string;
+  assignmentId?: string;
   userName: string;
   userRole: UserRole;
   courseId: string;

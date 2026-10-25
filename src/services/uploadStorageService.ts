@@ -26,14 +26,22 @@ export interface FileValidationResult {
 
 // Supported file format mappings
 export const SUPPORTED_EXTENSIONS = {
-  audio: ['mp3'],
-  video: ['mp4'],
-  document: ['pdf', 'doc', 'docx'],
-  spreadsheet: ['xls', 'xlsx'],
+  audio: ['mp3', 'wav', 'ogg', 'm4a'],
+  video: ['mp4', 'webm', 'mov'],
+  document: ['pdf', 'doc', 'docx', 'txt'],
+  spreadsheet: ['xls', 'xlsx', 'csv'],
   presentation: ['ppt', 'pptx'],
+  image: ['png', 'jpg', 'jpeg', 'webp', 'gif'],
 };
 
-export const ALL_ALLOWED_EXTENSIONS = ['mp3', 'mp4', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+export const ALL_ALLOWED_EXTENSIONS = [
+  'ppt', 'pptx',
+  'pdf', 'doc', 'docx', 'txt',
+  'xls', 'xlsx', 'csv',
+  'mp3', 'wav', 'ogg', 'm4a',
+  'mp4', 'webm', 'mov',
+  'png', 'jpg', 'jpeg', 'webp', 'gif'
+];
 
 /**
  * Validate selected file format against supported types
@@ -53,12 +61,16 @@ export function validateUploadedFile(file: File, allowedList?: string[]): FileVa
   if (!allowed.includes(ext)) {
     return {
       valid: false,
-      error: `Unsupported file type ".${ext}". Supported formats are: Audio (MP3), Video (MP4), Documents (DOC, DOCX, PDF), Spreadsheets (XLS, XLSX), Presentations (PPT, PPTX).`,
+      error: `Unsupported file type ".${ext}". Supported formats are: Presentations (PPT, PPTX), Documents (PDF, DOC, DOCX, TXT), Spreadsheets (XLS, XLSX, CSV), Audio (MP3, WAV), Video (MP4), and Images (PNG, JPG, JPEG, WEBP).`,
     };
   }
 
   let category: UploadCategory = 'document';
-  if (SUPPORTED_EXTENSIONS.audio.includes(ext)) {
+  if (SUPPORTED_EXTENSIONS.image.includes(ext)) {
+    category = 'image';
+  } else if (SUPPORTED_EXTENSIONS.presentation.includes(ext)) {
+    category = 'presentation';
+  } else if (SUPPORTED_EXTENSIONS.audio.includes(ext)) {
     category = 'audio';
   } else if (SUPPORTED_EXTENSIONS.video.includes(ext)) {
     category = 'video';
@@ -66,8 +78,6 @@ export function validateUploadedFile(file: File, allowedList?: string[]): FileVa
     category = 'document';
   } else if (SUPPORTED_EXTENSIONS.spreadsheet.includes(ext)) {
     category = 'spreadsheet';
-  } else if (SUPPORTED_EXTENSIONS.presentation.includes(ext)) {
-    category = 'presentation';
   }
 
   // Maximum file size limit: 50MB
@@ -155,36 +165,17 @@ export interface UploadOptions {
 /**
  * Upload a file with real byte upload progress tracking, state management, and reliable persistence
  */
-export async function uploadFileToStorage(
+/**
+ * Helper to upload file via server API proxy as fallback
+ */
+async function uploadToServerFallback(
   file: File,
   courseId: string,
   lessonId?: string,
-  onProgressOrOptions?:
-    | ((percent: number, transferred: number, total: number) => void)
-    | UploadOptions
+  options?: UploadOptions
 ): Promise<{ fileUrl: string; storagePath: string }> {
   const user = auth.currentUser;
-  if (!user) {
-    throw new Error('User must be signed in to perform Uploading activities.');
-  }
-
-  const options: UploadOptions =
-    typeof onProgressOrOptions === 'function'
-      ? { onProgress: onProgressOrOptions }
-      : onProgressOrOptions || {};
-
-  const { onProgress, onStateChange, signal } = options;
-
-  // 1. Validating state
-  onStateChange?.('validating', 'Validating file format and size...');
-  const validation = validateUploadedFile(file);
-  if (!validation.valid) {
-    onStateChange?.('error', validation.error || 'Validation failed');
-    throw new Error(validation.error || 'Invalid file format.');
-  }
-
-  // 2. Uploading state
-  onStateChange?.('uploading', 'Starting real-time file upload...');
+  const { onProgress, onStateChange, signal } = options || {};
 
   return new Promise<{ fileUrl: string; storagePath: string }>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -210,7 +201,6 @@ export async function uploadFileToStorage(
     };
 
     xhr.upload.onload = () => {
-      // Bytes transferred to server; server is now processing and persisting the file stream
       onProgress?.(100, file.size, file.size);
       onStateChange?.('processing', 'Processing and verifying file storage...');
     };
@@ -242,7 +232,7 @@ export async function uploadFileToStorage(
       console.warn('Network upload error, falling back to local persistent store...');
       try {
         const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const fallbackPath = `uploads/${user.uid}/${courseId}/${lessonId || 'general'}/${Date.now()}_${cleanName}`;
+        const fallbackPath = `uploads/${user?.uid || 'guest'}/${courseId}/${lessonId || 'general'}/${Date.now()}_${cleanName}`;
         const fallbackUrl = await saveFileToIndexedDB(fallbackPath, file);
         onProgress?.(100, file.size, file.size);
         resolve({
@@ -278,6 +268,127 @@ export async function uploadFileToStorage(
 }
 
 /**
+ * Upload student assignment or teacher resource to Firebase Storage with progress tracking,
+ * unique user/course/lesson/activity path, and reliable fallbacks.
+ */
+export async function uploadFileToStorage(
+  file: File,
+  courseId: string,
+  lessonId?: string,
+  activityIdOrOptions?:
+    | string
+    | ((percent: number, transferred: number, total: number) => void)
+    | UploadOptions,
+  maybeOptions?:
+    | ((percent: number, transferred: number, total: number) => void)
+    | UploadOptions
+): Promise<{ fileUrl: string; storagePath: string }> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User must be signed in to perform Uploading activities.');
+  }
+
+  let activityId: string | undefined = undefined;
+  let rawOptions: ((percent: number, transferred: number, total: number) => void) | UploadOptions | undefined = undefined;
+
+  if (typeof activityIdOrOptions === 'string') {
+    activityId = activityIdOrOptions;
+    rawOptions = maybeOptions;
+  } else {
+    rawOptions = activityIdOrOptions;
+  }
+
+  const options: UploadOptions =
+    typeof rawOptions === 'function'
+      ? { onProgress: rawOptions }
+      : rawOptions || {};
+
+  const { onProgress, onStateChange, signal } = options;
+
+  // 1. Validating state
+  onStateChange?.('validating', 'Validating file format and size...');
+  const validation = validateUploadedFile(file);
+  if (!validation.valid) {
+    onStateChange?.('error', validation.error || 'Validation failed');
+    throw new Error(validation.error || 'Invalid file format.');
+  }
+
+  // 2. Build unique storage path
+  const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const timestamp = Date.now();
+  const storagePath = `uploads/${user.uid}/${courseId}/${lessonId || 'general'}/${activityId || 'assignment'}/${timestamp}_${cleanName}`;
+
+  // 3. Primary: Direct Firebase Storage upload
+  onStateChange?.('uploading', 'Starting upload to Firebase Storage...');
+
+  try {
+    const storageRef = ref(storage, storagePath);
+    const uploadTask = uploadBytesResumable(storageRef, file, {
+      contentType: file.type || 'application/octet-stream',
+      customMetadata: {
+        userId: user.uid,
+        courseId,
+        lessonId: lessonId || '',
+        activityId: activityId || '',
+        fileName: file.name,
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+
+    if (signal) {
+      if (signal.aborted) {
+        uploadTask.cancel();
+        onStateChange?.('cancelled', 'Upload was cancelled.');
+        throw new Error('Upload cancelled.');
+      }
+      signal.addEventListener('abort', () => {
+        uploadTask.cancel();
+        onStateChange?.('cancelled', 'Upload was cancelled.');
+      });
+    }
+
+    uploadTask.on('state_changed', (snapshot) => {
+      if (snapshot.totalBytes > 0) {
+        const percent = Math.min(99, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+        onProgress?.(percent, snapshot.bytesTransferred, snapshot.totalBytes);
+        onStateChange?.('uploading', `Uploading... ${percent}%`);
+      }
+    });
+
+    const directUploadPromise = new Promise<{ fileUrl: string; storagePath: string }>(
+      (resolve, reject) => {
+        uploadTask.then(
+          async (snapshot) => {
+            try {
+              const downloadUrl = await getDownloadURL(snapshot.ref);
+              onProgress?.(100, file.size, file.size);
+              onStateChange?.('processing', 'File uploaded. Verifying storage...');
+              resolve({
+                fileUrl: downloadUrl,
+                storagePath,
+              });
+            } catch (urlErr) {
+              reject(urlErr);
+            }
+          },
+          (err) => reject(err)
+        );
+      }
+    );
+
+    // Timeout guard of 15 seconds for Firebase Storage direct upload
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Firebase Storage upload timeout')), 15000)
+    );
+
+    return await Promise.race([directUploadPromise, timeoutPromise]);
+  } catch (storageErr: any) {
+    console.warn('Firebase Storage direct upload failed or timed out, trying server upload fallback:', storageErr);
+    return await uploadToServerFallback(file, courseId, lessonId, options);
+  }
+}
+
+/**
  * Persist upload metadata into Firestore database
  */
 export async function createUploadRecord(
@@ -292,6 +403,8 @@ export async function createUploadRecord(
     const rawRecord: Record<string, any> = {
       ...data,
       id: docId,
+      studentId: data.userId,
+      assignmentId: data.activityId || '',
       createdAt: now,
       updatedAt: now,
     };

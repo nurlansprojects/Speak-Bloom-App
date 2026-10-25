@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { Lesson, Activity, ActivityFormat, AssessmentAttempt } from '../types';
 import { safeApiFetch } from '../lib/apiClient';
 import {
   getSupportedAudioMimeType,
   uploadSpeakingRecording,
 } from '../services/audioStorageService';
+import { createUploadRecord } from '../services/uploadStorageService';
 import {
   Mic,
   Square,
@@ -20,6 +22,7 @@ import {
   VolumeX,
   CheckCircle2,
   Radio,
+  UserCheck,
 } from 'lucide-react';
 
 interface SpeakingPracticeModalProps {
@@ -42,6 +45,7 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
   onComplete,
   onClose,
 }) => {
+  const { currentUser } = useAuth();
   const [activeFormat, setActiveFormat] = useState<ActivityFormat>(activity.format || 'recording');
 
   // Mode A: Text State
@@ -315,6 +319,88 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
 
   /* ================= SAFE ASSESSMENT SUBMISSION ================= */
 
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result?.toString().split(',')[1] || '';
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error('Failed to encode audio file'));
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const handleSubmitForTeacherReview = async () => {
+    if (!audioBlob || !currentUser || isEvaluating) return;
+    setIsEvaluating(true);
+    setErrorMessage(null);
+
+    try {
+      setUploadProgress(20);
+      const uploadResult = await uploadSpeakingRecording(
+        audioBlob,
+        lesson.courseId,
+        lesson.id,
+        (pct) => setUploadProgress(pct),
+        activity.id
+      );
+
+      // Save upload record into database
+      await createUploadRecord({
+        userId: currentUser.uid,
+        userName: studentName,
+        userRole: 'student',
+        courseId: lesson.courseId,
+        lessonId: lesson.id,
+        activityId: activity.id,
+        scope: 'student_submission',
+        title: `${activity.title} (Spoken Audio)`,
+        fileName: `recording_${Date.now()}.${detectedMimeType.includes('mp4') ? 'mp4' : 'webm'}`,
+        fileType: 'audio',
+        fileExtension: detectedMimeType.includes('mp4') ? 'mp4' : 'webm',
+        mimeType: detectedMimeType,
+        fileSize: audioBlob.size,
+        fileUrl: uploadResult.url,
+        storagePath: uploadResult.storagePath,
+        status: 'submitted',
+      });
+
+      const attemptResult: AssessmentAttempt = {
+        id: `att_${Date.now()}`,
+        studentId: currentUser.uid,
+        studentName,
+        courseId: lesson.courseId,
+        lessonId: lesson.id,
+        activityId: activity.id,
+        format: activeFormat,
+        content: 'Audio recorded and submitted for teacher review',
+        audioData: uploadResult.url,
+        scoreFluency: 0,
+        scoreVocabulary: 0,
+        scoreGrammar: 0,
+        scorePronunciation: 0,
+        scoreCoherence: 0,
+        scoreTaskAchievement: 0,
+        overallPercentage: 0,
+        passed: false,
+        evaluator: 'teacher',
+        feedback: 'Your speaking recording has been safely submitted for instructor review. Your teacher will evaluate your delivery and assign rubric scores.',
+        strengths: ['Audio successfully uploaded and saved'],
+        improvements: ['Awaiting instructor review'],
+        submittedAt: new Date().toISOString(),
+      };
+
+      onComplete(attemptResult);
+    } catch (err: any) {
+      console.error('Teacher review submit error:', err);
+      setErrorMessage(err.message || 'Failed to submit audio for teacher review.');
+    } finally {
+      setIsEvaluating(false);
+      setUploadProgress(null);
+    }
+  };
+
   const handleSubmitEvaluation = async () => {
     if (isEvaluating) return;
     setIsEvaluating(true);
@@ -322,6 +408,7 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
 
     let submissionText = '';
     let uploadedAudioUrl: string | undefined = undefined;
+    let currentBase64 = audioBase64;
 
     if (activeFormat === 'text') {
       if (!textInput.trim()) {
@@ -337,18 +424,61 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
         return;
       }
 
+      if (recordDuration < 2) {
+        setErrorMessage('Recording is too short. Please speak for at least 2 seconds before submitting.');
+        setIsEvaluating(false);
+        return;
+      }
+
+      // Ensure base64 is converted even if reader was pending
+      if (!currentBase64) {
+        try {
+          currentBase64 = await blobToBase64(audioBlob);
+          setAudioBase64(currentBase64);
+        } catch {
+          console.warn('Could not encode audio to base64');
+        }
+      }
+
       // Real audio upload to Firebase Storage with progress tracking
       try {
-        setUploadProgress(10);
+        setUploadProgress(15);
         const uploadResult = await uploadSpeakingRecording(
           audioBlob,
           lesson.courseId,
           lesson.id,
-          (pct) => setUploadProgress(pct)
+          (pct) => setUploadProgress(pct),
+          activity.id
         );
         uploadedAudioUrl = uploadResult.url;
+
+        // Persist upload metadata record in Firestore uploads collection
+        if (currentUser) {
+          try {
+            await createUploadRecord({
+              userId: currentUser.uid,
+              userName: studentName,
+              userRole: 'student',
+              courseId: lesson.courseId,
+              lessonId: lesson.id,
+              activityId: activity.id,
+              scope: 'student_submission',
+              title: `${activity.title} (Spoken Audio)`,
+              fileName: `speaking_${Date.now()}.${detectedMimeType.includes('mp4') ? 'mp4' : 'webm'}`,
+              fileType: 'audio',
+              fileExtension: detectedMimeType.includes('mp4') ? 'mp4' : 'webm',
+              mimeType: detectedMimeType,
+              fileSize: audioBlob.size,
+              fileUrl: uploadResult.url,
+              storagePath: uploadResult.storagePath,
+              status: 'submitted',
+            });
+          } catch (uploadRecErr) {
+            console.warn('Could not record audio upload in database:', uploadRecErr);
+          }
+        }
       } catch (uploadErr) {
-        console.warn('Upload error, continuing with base64 payload:', uploadErr);
+        console.warn('Storage upload error, continuing with base64 payload:', uploadErr);
       }
     } else if (activeFormat === 'ai_conversation') {
       const userResponses = chatHistory
@@ -365,36 +495,46 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
     }
 
     try {
-      const res = await safeApiFetch<any>('/api/ai/assess', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          submissionText,
-          audioBase64: audioBase64 || undefined,
-          mimeType: detectedMimeType,
-          masteryThreshold: lesson.requiredMasteryScore || 75,
-          lessonContext: {
-            title: lesson.title,
-            targetOutcome: lesson.targetSpeakingOutcome,
-            cefrLevel: lesson.cefrLevel,
-            bloomLevel: activity.bloomLevel,
-            prompt: activity.prompt,
-            expectedResponse: activity.expectedResponse,
-          },
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+      let res: any;
+      try {
+        res = await safeApiFetch<any>('/api/ai/assess', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            submissionText,
+            audioBase64: currentBase64 || undefined,
+            mimeType: detectedMimeType,
+            masteryThreshold: lesson.requiredMasteryScore || 75,
+            lessonContext: {
+              title: lesson.title,
+              targetOutcome: lesson.targetSpeakingOutcome,
+              cefrLevel: lesson.cefrLevel,
+              bloomLevel: activity.bloomLevel,
+              prompt: activity.prompt,
+              expectedResponse: activity.expectedResponse,
+            },
+          }),
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!res.success || !res.data) {
-        throw new Error(
-          res.error?.message || 'Evaluation service could not evaluate the submission. Please try again.'
+        setErrorMessage(
+          res.error?.message || 'Evaluation service could not evaluate the submission. Please try again or submit for teacher review.'
         );
+        return;
       }
 
       const evalData = res.data;
 
       const attemptResult: AssessmentAttempt = {
         id: `att_${Date.now()}`,
-        studentId: '',
+        studentId: currentUser?.uid || '',
         studentName,
         courseId: lesson.courseId,
         lessonId: lesson.id,
@@ -420,8 +560,12 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
 
       onComplete(attemptResult);
     } catch (err: any) {
-      console.error('Assessment submit error:', err);
-      setErrorMessage(err.message || 'Failed to complete assessment.');
+      console.warn('Assessment evaluation warning:', err?.message || err);
+      if (err.name === 'AbortError') {
+        setErrorMessage('Evaluation request timed out after 18 seconds. Your audio recording is preserved. You can retry evaluation or submit for teacher review.');
+      } else {
+        setErrorMessage(err.message || 'Failed to complete assessment.');
+      }
     } finally {
       setIsEvaluating(false);
       setUploadProgress(null);
@@ -545,13 +689,26 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
                     {formatSeconds(recordDuration)}
                   </div>
                 </div>
+
+                {/* Live audio soundwave activity indicator */}
+                {isRecording && !isPaused && (
+                  <div className="flex items-center justify-center gap-1.5 my-2.5 h-7">
+                    <span className="w-1 h-3 bg-[#6546D7] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1 h-5 bg-[#6546D7] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1 h-7 bg-[#6546D7] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="w-1 h-4 bg-[#6546D7] rounded-full animate-bounce" style={{ animationDelay: '450ms' }} />
+                    <span className="w-1 h-6 bg-[#6546D7] rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
+                    <span className="w-1 h-3 bg-[#6546D7] rounded-full animate-bounce" style={{ animationDelay: '350ms' }} />
+                  </div>
+                )}
+
                 <div className="text-xs text-[#7F7C8E] mt-1.5">
                   {isRecording
                     ? isPaused
                       ? 'Recording paused — press Resume when ready'
                       : 'Listening... Speak clearly into your microphone'
                     : audioUrl
-                    ? 'Recording ready for preview & submission'
+                    ? `Recording complete (${formatSeconds(recordDuration)}). Listen below and submit.`
                     : 'Tap microphone to start speaking'}
                 </div>
               </div>
@@ -708,11 +865,43 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
             </div>
           )}
 
-          {/* Error notice */}
+          {/* Error notice & actionable recovery */}
           {errorMessage && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                <span className="font-medium leading-relaxed">{errorMessage}</span>
+              </div>
+
+              {activeFormat === 'recording' && audioBlob && (
+                <div className="pt-2 border-t border-rose-200/80 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleSubmitEvaluation}
+                    disabled={isEvaluating}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#6546D7] hover:bg-[#5235BE] text-white text-[11px] font-semibold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Retry Evaluation</span>
+                  </button>
+
+                  <button
+                    onClick={handleSubmitForTeacherReview}
+                    disabled={isEvaluating}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#D5D2E2] hover:bg-[#FAF9FC] text-[#322F40] text-[11px] font-semibold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    <UserCheck className="w-3 h-3 text-[#6546D7]" />
+                    <span>Submit for Instructor Review</span>
+                  </button>
+
+                  <button
+                    onClick={resetRecording}
+                    disabled={isEvaluating}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-rose-100/60 text-rose-700 text-[11px] font-semibold transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <span>Record New Take</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

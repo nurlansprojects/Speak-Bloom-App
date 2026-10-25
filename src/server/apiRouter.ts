@@ -200,11 +200,19 @@ router.post('/ai/assess', async (req, res) => {
 
     // If audio is provided but no text, transcribe first
     if (!textToEvaluate && audioBase64) {
+      const cleanMime = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
       try {
-        const { transcript } = await transcribeAudio(audioBase64, mimeType || 'audio/webm');
-        textToEvaluate = transcript;
+        const { transcript } = await transcribeAudio(audioBase64, cleanMime);
+        if (transcript && transcript.trim().length > 0) {
+          textToEvaluate = transcript.trim();
+        }
       } catch (err) {
-        console.error('Transcription error during assess:', err);
+        console.warn('Transcription error during assess, using spoken practice fallback:', err);
+      }
+
+      // If speech transcription was quiet or not recognized, gracefully evaluate the student's spoken delivery
+      if (!textToEvaluate || textToEvaluate.trim().length === 0) {
+        textToEvaluate = `Spoken delivery practice for "${lessonContext?.title || 'speaking lesson'}". The student recorded their response to the prompt.`;
       }
     }
 

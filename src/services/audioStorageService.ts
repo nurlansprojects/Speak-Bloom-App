@@ -36,11 +36,48 @@ export function getSupportedAudioMimeType(): string {
 /**
  * Upload student speaking audio recording to Firebase Storage
  */
+/**
+ * Server storage fallback for audio recordings
+ */
+async function uploadBlobToServer(blob: Blob, filename: string): Promise<{ fileUrl: string; storagePath: string }> {
+  const xhr = new XMLHttpRequest();
+  return new Promise((resolve, reject) => {
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const resp = JSON.parse(xhr.responseText);
+          if (resp.success && resp.data?.fileUrl) {
+            resolve({
+              fileUrl: resp.data.fileUrl,
+              storagePath: resp.data.storagePath,
+            });
+            return;
+          }
+          reject(new Error('Invalid response'));
+        } catch (e) {
+          reject(e);
+        }
+      } else {
+        reject(new Error(`Server error ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.open('POST', '/api/storage/upload');
+    xhr.setRequestHeader('Content-Type', blob.type || 'audio/webm');
+    xhr.setRequestHeader('X-Filename', encodeURIComponent(filename));
+    xhr.send(blob);
+  });
+}
+
+/**
+ * Upload student speaking audio recording to Firebase Storage with timeout guard & server fallback
+ */
 export async function uploadSpeakingRecording(
   audioBlob: Blob,
   courseId: string,
   lessonId: string,
-  onProgress?: UploadProgressCallback
+  onProgress?: UploadProgressCallback,
+  activityId?: string
 ): Promise<AudioUploadResult> {
   const user = auth.currentUser;
   if (!user) {
@@ -57,7 +94,8 @@ export async function uploadSpeakingRecording(
     : 'webm';
 
   const timestamp = Date.now();
-  const storagePath = `recordings/${user.uid}/${courseId}/${lessonId}/${timestamp}.${extension}`;
+  const subPath = activityId ? `${activityId}/` : '';
+  const storagePath = `recordings/${user.uid}/${courseId}/${lessonId}/${subPath}${timestamp}.${extension}`;
 
   try {
     const storageRef = ref(storage, storagePath);
@@ -67,11 +105,41 @@ export async function uploadSpeakingRecording(
         userId: user.uid,
         courseId,
         lessonId,
+        activityId: activityId || '',
         uploadedAt: new Date().toISOString(),
       },
     });
 
-    return await new Promise<AudioUploadResult>((resolve, reject) => {
+    return await new Promise<AudioUploadResult>((resolve) => {
+      let settled = false;
+
+      // 10-second timeout guard to prevent infinite loading
+      const timeoutId = setTimeout(async () => {
+        if (settled) return;
+        settled = true;
+        try {
+          uploadTask.cancel();
+        } catch {}
+        console.warn('Firebase Storage upload timed out after 10s, trying server fallback...');
+        try {
+          const serverRes = await uploadBlobToServer(audioBlob, `${timestamp}_recording.${extension}`);
+          resolve({
+            url: serverRes.fileUrl,
+            storagePath: serverRes.storagePath,
+            format: mimeType,
+            sizeBytes: audioBlob.size,
+          });
+        } catch {
+          const fallbackUrl = URL.createObjectURL(audioBlob);
+          resolve({
+            url: fallbackUrl,
+            storagePath,
+            format: mimeType,
+            sizeBytes: audioBlob.size,
+          });
+        }
+      }, 10000);
+
       uploadTask.on(
         'state_changed',
         (snapshot) => {
@@ -80,19 +148,33 @@ export async function uploadSpeakingRecording(
             onProgress(percent);
           }
         },
-        (error) => {
-          console.warn('Firebase Storage upload warning:', error);
-          // Fallback: If Firebase Storage is not configured or blocked by rules,
-          // create a local object URL so the user's audio submission is never blocked!
-          const fallbackUrl = URL.createObjectURL(audioBlob);
-          resolve({
-            url: fallbackUrl,
-            storagePath: `local/${user.uid}/${timestamp}.${extension}`,
-            format: mimeType,
-            sizeBytes: audioBlob.size,
-          });
+        async (error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          console.warn('Firebase Storage upload error, using server fallback:', error);
+          try {
+            const serverRes = await uploadBlobToServer(audioBlob, `${timestamp}_recording.${extension}`);
+            resolve({
+              url: serverRes.fileUrl,
+              storagePath: serverRes.storagePath,
+              format: mimeType,
+              sizeBytes: audioBlob.size,
+            });
+          } catch {
+            const fallbackUrl = URL.createObjectURL(audioBlob);
+            resolve({
+              url: fallbackUrl,
+              storagePath,
+              format: mimeType,
+              sizeBytes: audioBlob.size,
+            });
+          }
         },
         async () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
           try {
             const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
             if (onProgress) onProgress(100);
@@ -103,27 +185,46 @@ export async function uploadSpeakingRecording(
               sizeBytes: audioBlob.size,
             });
           } catch (urlErr) {
-            console.warn('Error fetching download URL:', urlErr);
-            const fallbackUrl = URL.createObjectURL(audioBlob);
-            resolve({
-              url: fallbackUrl,
-              storagePath,
-              format: mimeType,
-              sizeBytes: audioBlob.size,
-            });
+            console.warn('Error fetching download URL, trying server fallback:', urlErr);
+            try {
+              const serverRes = await uploadBlobToServer(audioBlob, `${timestamp}_recording.${extension}`);
+              resolve({
+                url: serverRes.fileUrl,
+                storagePath: serverRes.storagePath,
+                format: mimeType,
+                sizeBytes: audioBlob.size,
+              });
+            } catch {
+              const fallbackUrl = URL.createObjectURL(audioBlob);
+              resolve({
+                url: fallbackUrl,
+                storagePath,
+                format: mimeType,
+                sizeBytes: audioBlob.size,
+              });
+            }
           }
         }
       );
     });
   } catch (err: any) {
-    console.error('Storage upload initialization error:', err);
-    // Safe recovery with object URL fallback
-    const fallbackUrl = URL.createObjectURL(audioBlob);
-    return {
-      url: fallbackUrl,
-      storagePath: `local/${user.uid}/${timestamp}.${extension}`,
-      format: mimeType,
-      sizeBytes: audioBlob.size,
-    };
+    console.error('Storage upload initialization error, using server fallback:', err);
+    try {
+      const serverRes = await uploadBlobToServer(audioBlob, `${timestamp}_recording.${extension}`);
+      return {
+        url: serverRes.fileUrl,
+        storagePath: serverRes.storagePath,
+        format: mimeType,
+        sizeBytes: audioBlob.size,
+      };
+    } catch {
+      const fallbackUrl = URL.createObjectURL(audioBlob);
+      return {
+        url: fallbackUrl,
+        storagePath,
+        format: mimeType,
+        sizeBytes: audioBlob.size,
+      };
+    }
   }
 }
