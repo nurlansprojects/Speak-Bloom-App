@@ -67,14 +67,16 @@ function MainApp() {
         studentName: userProfile?.displayName || 'Learner',
       });
 
-      // 2. Update authoritative progress and check mastery gates
-      const { nextUnlockedLessonId, isCourseCompleted } = await recordLessonAssessment(
-        currentUser.uid,
-        attempt.courseId,
-        attempt.lessonId,
-        attempt.overallPercentage,
-        attempt.passed
-      );
+      // 2. Only if AI evaluated or already graded, update authoritative progress
+      if (attempt.evaluator === 'ai' || attempt.status === 'graded') {
+        await recordLessonAssessment(
+          currentUser.uid,
+          attempt.courseId,
+          attempt.lessonId,
+          attempt.overallPercentage,
+          attempt.passed
+        );
+      }
 
       const savedAttempt: AssessmentAttempt = {
         ...attempt,
@@ -193,6 +195,7 @@ function MainApp() {
           />
         ) : (
           <SpeakingPracticeModal
+            course={selectedCourse || undefined}
             lesson={selectedLesson}
             activity={activeActivity}
             studentName={userProfile?.displayName || 'Learner'}

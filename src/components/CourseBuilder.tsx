@@ -36,6 +36,7 @@ import {
   X,
   UploadCloud,
 } from 'lucide-react';
+import { getActivityIcon, getActivityFormatLabel } from '../utils/activityUtils';
 
 interface CourseBuilderProps {
   existingCourse?: Course | null;
@@ -759,10 +760,10 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
                                             className="text-xs text-[#4F4B5D] flex items-center justify-between p-2 rounded-xl bg-[#FAF9FC] border border-[#ECEAF2]"
                                           >
                                             <div className="flex items-center gap-2 truncate pr-2">
-                                              <span className="w-1.5 h-1.5 rounded-full bg-[#6546D7] shrink-0" />
+                                              {getActivityIcon(act.format, 'w-3.5 h-3.5 text-[#6546D7] shrink-0')}
                                               <span className="font-semibold">{act.title}</span>
-                                              <span className="text-[#898696] text-[11px] font-semibold">
-                                                ({act.format === 'uploading' ? 'Uploading' : act.format.toUpperCase()})
+                                              <span className="text-[#898696] text-[11px] font-medium">
+                                                • {getActivityFormatLabel(act.format)}
                                               </span>
                                             </div>
                                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white border border-[#E0DDEB] text-[#6546D7] shrink-0">
@@ -1010,14 +1011,24 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
                   onChange={(e) => setActivityFormat(e.target.value as ActivityFormat)}
                   className="w-full px-3 py-2 rounded-xl border border-[#D5D2E2] bg-white text-xs focus:outline-none focus:border-[#6546D7]"
                 >
-                  <option value="recording">Voice Recording (Rubric Evaluated)</option>
-                  <option value="ai_conversation">Interactive AI Speaking Partner</option>
-                  <option value="text">Text Response Preparation</option>
-                  <option value="uploading">Uploading (Files, Audio, Video & Coursework)</option>
+                  <option value="text">Text Response / Preparation (Teacher Assessed)</option>
+                  <option value="recording">Voice Recording (Teacher Assessed)</option>
+                  <option value="uploading">File Uploading (Teacher Assessed)</option>
+                  <option value="ai_conversation">Interactive AI Speaking Partner (AI Rubric Evaluated)</option>
                 </select>
                 {activityFormat === 'uploading' && (
                   <p className="text-[11px] text-[#6546D7] bg-[#F4F1FD] p-2 rounded-lg border border-[#DDD7F5]">
-                    Supports MP3, MP4, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX. Students and teachers can submit files with progress tracking, error retries, and teacher evaluations.
+                    Supports PPTX, PDF, DOCX, XLSX, MP3, MP4. Students submit work directly to the teacher's grading queue with score (0–100) and feedback.
+                  </p>
+                )}
+                {activityFormat === 'text' && (
+                  <p className="text-[11px] text-[#6546D7] bg-[#F4F1FD] p-2 rounded-lg border border-[#DDD7F5]">
+                    Students submit their written response directly to the teacher's grading queue for review, numerical score, and personalized feedback.
+                  </p>
+                )}
+                {activityFormat === 'recording' && (
+                  <p className="text-[11px] text-[#6546D7] bg-[#F4F1FD] p-2 rounded-lg border border-[#DDD7F5]">
+                    Students record spoken audio directly into the browser and submit for instructor audio playback, grading, and review.
                   </p>
                 )}
               </div>

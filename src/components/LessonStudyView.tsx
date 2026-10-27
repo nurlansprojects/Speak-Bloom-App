@@ -14,8 +14,14 @@ import {
   Square,
   VolumeX,
   UploadCloud,
+  PenLine,
 } from 'lucide-react';
 import { LessonUploadingSection } from './LessonUploadingSection';
+import {
+  getActivityIcon,
+  getActivityFormatLabel,
+  getActivityActionLabel,
+} from '../utils/activityUtils';
 
 interface LessonStudyViewProps {
   course: Course;
@@ -448,14 +454,9 @@ export const LessonStudyView: React.FC<LessonStudyViewProps> = ({
                     <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#ECE8F8] text-[#6546D7]">
                       {act.bloomLevel}
                     </span>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#E5E3EF] text-[#615E70] uppercase">
-                      {act.format === 'recording'
-                        ? 'Voice Recording'
-                        : act.format === 'ai_conversation'
-                        ? 'AI Conversation'
-                        : act.format === 'uploading'
-                        ? 'Uploading'
-                        : 'Text Response'}
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#E5E3EF] text-[#615E70] uppercase flex items-center gap-1.5">
+                      {getActivityIcon(act.format, 'w-3 h-3 text-[#6546D7]')}
+                      <span>{getActivityFormatLabel(act.format)}</span>
                     </span>
                   </div>
                   <h4 className="font-bold text-sm text-[#1A1826]">{act.title}</h4>
@@ -470,17 +471,8 @@ export const LessonStudyView: React.FC<LessonStudyViewProps> = ({
                   disabled={!isUnlocked}
                   className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#6546D7] hover:bg-[#5235BF] disabled:opacity-50 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
                 >
-                  {act.format === 'uploading' ? (
-                    <>
-                      <UploadCloud className="w-3.5 h-3.5" />
-                      <span>Uploading</span>
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="w-3.5 h-3.5" />
-                      <span>Start Practice</span>
-                    </>
-                  )}
+                  {getActivityIcon(act.format, 'w-3.5 h-3.5 text-white')}
+                  <span>{getActivityActionLabel(act.format)}</span>
                 </button>
               </div>
             ))}

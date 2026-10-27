@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Lesson, Activity, ActivityFormat, AssessmentAttempt } from '../types';
+import { Course, Lesson, Activity, ActivityFormat, AssessmentAttempt } from '../types';
 import { safeApiFetch } from '../lib/apiClient';
 import {
   getSupportedAudioMimeType,
   uploadSpeakingRecording,
 } from '../services/audioStorageService';
 import { createUploadRecord } from '../services/uploadStorageService';
+import { getActivityIcon, getActivityFormatLabel } from '../utils/activityUtils';
 import {
   Mic,
   Square,
@@ -18,6 +19,8 @@ import {
   Volume2,
   AlertCircle,
   MessageSquare,
+  PenLine,
+  FileText,
   X,
   VolumeX,
   CheckCircle2,
@@ -26,6 +29,7 @@ import {
 } from 'lucide-react';
 
 interface SpeakingPracticeModalProps {
+  course?: Course;
   lesson: Lesson;
   activity: Activity;
   studentName: string;
@@ -39,6 +43,7 @@ interface ChatTurn {
 }
 
 export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
+  course,
   lesson,
   activity,
   studentName,
@@ -332,134 +337,31 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
   };
 
   const handleSubmitForTeacherReview = async () => {
-    if (!audioBlob || !currentUser || isEvaluating) return;
-    setIsEvaluating(true);
-    setErrorMessage(null);
-
-    try {
-      setUploadProgress(20);
-      const uploadResult = await uploadSpeakingRecording(
-        audioBlob,
-        lesson.courseId,
-        lesson.id,
-        (pct) => setUploadProgress(pct),
-        activity.id
-      );
-
-      // Save upload record into database
-      await createUploadRecord({
-        userId: currentUser.uid,
-        userName: studentName,
-        userRole: 'student',
-        courseId: lesson.courseId,
-        lessonId: lesson.id,
-        activityId: activity.id,
-        scope: 'student_submission',
-        title: `${activity.title} (Spoken Audio)`,
-        fileName: `recording_${Date.now()}.${detectedMimeType.includes('mp4') ? 'mp4' : 'webm'}`,
-        fileType: 'audio',
-        fileExtension: detectedMimeType.includes('mp4') ? 'mp4' : 'webm',
-        mimeType: detectedMimeType,
-        fileSize: audioBlob.size,
-        fileUrl: uploadResult.url,
-        storagePath: uploadResult.storagePath,
-        status: 'submitted',
-      });
-
-      const attemptResult: AssessmentAttempt = {
-        id: `att_${Date.now()}`,
-        studentId: currentUser.uid,
-        studentName,
-        courseId: lesson.courseId,
-        lessonId: lesson.id,
-        activityId: activity.id,
-        format: activeFormat,
-        content: 'Audio recorded and submitted for teacher review',
-        audioData: uploadResult.url,
-        scoreFluency: 0,
-        scoreVocabulary: 0,
-        scoreGrammar: 0,
-        scorePronunciation: 0,
-        scoreCoherence: 0,
-        scoreTaskAchievement: 0,
-        overallPercentage: 0,
-        passed: false,
-        evaluator: 'teacher',
-        feedback: 'Your speaking recording has been safely submitted for instructor review. Your teacher will evaluate your delivery and assign rubric scores.',
-        strengths: ['Audio successfully uploaded and saved'],
-        improvements: ['Awaiting instructor review'],
-        submittedAt: new Date().toISOString(),
-      };
-
-      onComplete(attemptResult);
-    } catch (err: any) {
-      console.error('Teacher review submit error:', err);
-      setErrorMessage(err.message || 'Failed to submit audio for teacher review.');
-    } finally {
-      setIsEvaluating(false);
-      setUploadProgress(null);
-    }
-  };
-
-  const handleSubmitEvaluation = async () => {
     if (isEvaluating) return;
     setIsEvaluating(true);
     setErrorMessage(null);
 
-    let submissionText = '';
-    let uploadedAudioUrl: string | undefined = undefined;
-    let currentBase64 = audioBase64;
+    try {
+      let uploadedAudioUrl = audioUrl || undefined;
 
-    if (activeFormat === 'text') {
-      if (!textInput.trim()) {
-        setErrorMessage('Please type your response before submitting.');
-        setIsEvaluating(false);
-        return;
-      }
-      submissionText = textInput.trim();
-    } else if (activeFormat === 'recording') {
-      if (!audioBlob) {
-        setErrorMessage('Please record your speaking response before submitting.');
-        setIsEvaluating(false);
-        return;
-      }
-
-      if (recordDuration < 2) {
-        setErrorMessage('Recording is too short. Please speak for at least 2 seconds before submitting.');
-        setIsEvaluating(false);
-        return;
-      }
-
-      // Ensure base64 is converted even if reader was pending
-      if (!currentBase64) {
-        try {
-          currentBase64 = await blobToBase64(audioBlob);
-          setAudioBase64(currentBase64);
-        } catch {
-          console.warn('Could not encode audio to base64');
-        }
-      }
-
-      // Real audio upload to Firebase Storage with progress tracking
-      try {
+      if (audioBlob) {
         setUploadProgress(15);
         const uploadResult = await uploadSpeakingRecording(
           audioBlob,
-          lesson.courseId,
+          course?.id || lesson.courseId,
           lesson.id,
           (pct) => setUploadProgress(pct),
           activity.id
         );
         uploadedAudioUrl = uploadResult.url;
 
-        // Persist upload metadata record in Firestore uploads collection
         if (currentUser) {
           try {
             await createUploadRecord({
               userId: currentUser.uid,
               userName: studentName,
               userRole: 'student',
-              courseId: lesson.courseId,
+              courseId: course?.id || lesson.courseId,
               lessonId: lesson.id,
               activityId: activity.id,
               scope: 'student_submission',
@@ -477,21 +379,208 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
             console.warn('Could not record audio upload in database:', uploadRecErr);
           }
         }
-      } catch (uploadErr) {
-        console.warn('Storage upload error, continuing with base64 payload:', uploadErr);
       }
-    } else if (activeFormat === 'ai_conversation') {
-      const userResponses = chatHistory
-        .filter((t) => t.role === 'user')
-        .map((t) => t.content)
-        .join(' \n');
 
-      if (!userResponses.trim()) {
-        setErrorMessage('Please exchange at least one speaking turn with Bloom before completing.');
+      const attemptResult: AssessmentAttempt = {
+        id: `att_${Date.now()}`,
+        studentId: currentUser?.uid || '',
+        studentName,
+        courseId: course?.id || lesson.courseId,
+        courseTitle: course?.title || 'English Speaking Course',
+        lessonId: lesson.id,
+        lessonTitle: lesson.title,
+        activityId: activity.id,
+        activityTitle: activity.title,
+        format: activeFormat,
+        content: activeFormat === 'text' ? textInput.trim() : (activity.prompt || 'Spoken audio response'),
+        audioData: uploadedAudioUrl,
+        scoreFluency: 0,
+        scoreVocabulary: 0,
+        scoreGrammar: 0,
+        scorePronunciation: 0,
+        scoreCoherence: 0,
+        scoreTaskAchievement: 0,
+        overallPercentage: 0,
+        passed: false,
+        evaluator: 'teacher',
+        status: 'submitted',
+        feedback: 'Your submission has been safely recorded for teacher evaluation. Your instructor will review your work, provide feedback, and assign your score.',
+        strengths: ['Submission delivered for teacher review'],
+        improvements: ['Awaiting instructor review'],
+        submittedAt: new Date().toISOString(),
+      };
+
+      onComplete(attemptResult);
+    } catch (err: any) {
+      console.error('Teacher review submit error:', err);
+      setErrorMessage(err.message || 'Failed to submit response for teacher review.');
+    } finally {
+      setIsEvaluating(false);
+      setUploadProgress(null);
+    }
+  };
+
+  const handleSubmitEvaluation = async () => {
+    if (isEvaluating) return;
+    setIsEvaluating(true);
+    setErrorMessage(null);
+
+    // ==========================================
+    // 1. Text Response / Text Preparation Mode
+    // Must use manual teacher assessment
+    // ==========================================
+    if (activeFormat === 'text') {
+      const cleanText = textInput.trim();
+      if (!cleanText) {
+        setErrorMessage('Please write your response before submitting.');
         setIsEvaluating(false);
         return;
       }
-      submissionText = userResponses;
+
+      try {
+        const attemptResult: AssessmentAttempt = {
+          id: `att_${Date.now()}`,
+          studentId: currentUser?.uid || '',
+          studentName,
+          courseId: course?.id || lesson.courseId,
+          courseTitle: course?.title || 'English Speaking Course',
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          activityId: activity.id,
+          activityTitle: activity.title,
+          format: 'text',
+          content: cleanText,
+          evaluator: 'teacher',
+          status: 'submitted',
+          scoreFluency: 0,
+          scoreVocabulary: 0,
+          scoreGrammar: 0,
+          scorePronunciation: 0,
+          scoreCoherence: 0,
+          scoreTaskAchievement: 0,
+          overallPercentage: 0,
+          passed: false,
+          feedback: 'Your written text response has been successfully submitted for instructor review. Your teacher will evaluate your work and assign a score.',
+          strengths: ['Written text response submitted for teacher grading'],
+          improvements: ['Awaiting instructor review and feedback'],
+          submittedAt: new Date().toISOString(),
+        };
+
+        onComplete(attemptResult);
+      } catch (err: any) {
+        console.error('Text submission error:', err);
+        setErrorMessage(err.message || 'Failed to submit written response.');
+      } finally {
+        setIsEvaluating(false);
+      }
+      return;
+    }
+
+    // ==========================================
+    // 2. Voice Recording Mode
+    // Must use manual teacher assessment
+    // ==========================================
+    if (activeFormat === 'recording') {
+      if (!audioBlob) {
+        setErrorMessage('Please record your speaking response before submitting.');
+        setIsEvaluating(false);
+        return;
+      }
+
+      if (recordDuration < 2) {
+        setErrorMessage('Recording is too short. Please speak for at least 2 seconds before submitting.');
+        setIsEvaluating(false);
+        return;
+      }
+
+      try {
+        setUploadProgress(15);
+        const uploadResult = await uploadSpeakingRecording(
+          audioBlob,
+          course?.id || lesson.courseId,
+          lesson.id,
+          (pct) => setUploadProgress(pct),
+          activity.id
+        );
+
+        if (currentUser) {
+          try {
+            await createUploadRecord({
+              userId: currentUser.uid,
+              userName: studentName,
+              userRole: 'student',
+              courseId: course?.id || lesson.courseId,
+              lessonId: lesson.id,
+              activityId: activity.id,
+              scope: 'student_submission',
+              title: `${activity.title} (Spoken Audio)`,
+              fileName: `speaking_${Date.now()}.${detectedMimeType.includes('mp4') ? 'mp4' : 'webm'}`,
+              fileType: 'audio',
+              fileExtension: detectedMimeType.includes('mp4') ? 'mp4' : 'webm',
+              mimeType: detectedMimeType,
+              fileSize: audioBlob.size,
+              fileUrl: uploadResult.url,
+              storagePath: uploadResult.storagePath,
+              status: 'submitted',
+            });
+          } catch (uploadRecErr) {
+            console.warn('Could not record audio upload in database:', uploadRecErr);
+          }
+        }
+
+        const attemptResult: AssessmentAttempt = {
+          id: `att_${Date.now()}`,
+          studentId: currentUser?.uid || '',
+          studentName,
+          courseId: course?.id || lesson.courseId,
+          courseTitle: course?.title || 'English Speaking Course',
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          activityId: activity.id,
+          activityTitle: activity.title,
+          format: 'recording',
+          content: activity.prompt || 'Spoken audio response',
+          audioData: uploadResult.url,
+          evaluator: 'teacher',
+          status: 'submitted',
+          scoreFluency: 0,
+          scoreVocabulary: 0,
+          scoreGrammar: 0,
+          scorePronunciation: 0,
+          scoreCoherence: 0,
+          scoreTaskAchievement: 0,
+          overallPercentage: 0,
+          passed: false,
+          feedback: 'Your voice recording has been safely submitted for instructor review. Your teacher will evaluate your delivery and assign a score.',
+          strengths: ['Audio successfully uploaded and saved for review'],
+          improvements: ['Awaiting instructor review and feedback'],
+          submittedAt: new Date().toISOString(),
+        };
+
+        onComplete(attemptResult);
+      } catch (err: any) {
+        console.error('Voice submission error:', err);
+        setErrorMessage(err.message || 'Failed to submit voice recording.');
+      } finally {
+        setIsEvaluating(false);
+        setUploadProgress(null);
+      }
+      return;
+    }
+
+    // ==========================================
+    // 3. AI Speaking Partner Mode
+    // Preserves automated AI rubric evaluation
+    // ==========================================
+    const userResponses = chatHistory
+      .filter((t) => t.role === 'user')
+      .map((t) => t.content)
+      .join(' \n');
+
+    if (!userResponses.trim()) {
+      setErrorMessage('Please exchange at least one speaking turn with Bloom before completing.');
+      setIsEvaluating(false);
+      return;
     }
 
     try {
@@ -505,8 +594,8 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({
-            submissionText,
-            audioBase64: currentBase64 || undefined,
+            submissionText: userResponses,
+            audioBase64: audioBase64 || undefined,
             mimeType: detectedMimeType,
             masteryThreshold: lesson.requiredMasteryScore || 75,
             lessonContext: {
@@ -536,12 +625,15 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
         id: `att_${Date.now()}`,
         studentId: currentUser?.uid || '',
         studentName,
-        courseId: lesson.courseId,
+        courseId: course?.id || lesson.courseId,
+        courseTitle: course?.title || 'English Speaking Course',
         lessonId: lesson.id,
+        lessonTitle: lesson.title,
         activityId: activity.id,
-        format: activeFormat,
-        content: evalData.transcript || submissionText || 'Spoken submission',
-        audioData: uploadedAudioUrl || audioUrl || undefined,
+        activityTitle: activity.title,
+        format: 'ai_conversation',
+        content: evalData.transcript || userResponses || 'Spoken conversation',
+        audioData: audioUrl || undefined,
         scoreFluency: evalData.scoreFluency || 3,
         scoreVocabulary: evalData.scoreVocabulary || 3,
         scoreGrammar: evalData.scoreGrammar || 3,
@@ -551,6 +643,8 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
         overallPercentage: evalData.overallPercentage || 75,
         passed: evalData.passed ?? evalData.overallPercentage >= (lesson.requiredMasteryScore || 75),
         evaluator: 'ai',
+        status: 'graded',
+        score: evalData.overallPercentage || 75,
         feedback: evalData.feedback || 'Good effort fulfilling the speaking task.',
         strengths: evalData.strengths || ['Clear communication', 'Engaged with topic'],
         improvements: evalData.improvements || ['Focus on sentence transitions', 'Expand vocabulary range'],
@@ -562,7 +656,7 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
     } catch (err: any) {
       console.warn('Assessment evaluation warning:', err?.message || err);
       if (err.name === 'AbortError') {
-        setErrorMessage('Evaluation request timed out after 18 seconds. Your audio recording is preserved. You can retry evaluation or submit for teacher review.');
+        setErrorMessage('Evaluation request timed out. You can retry or submit for teacher review.');
       } else {
         setErrorMessage(err.message || 'Failed to complete assessment.');
       }
@@ -617,6 +711,17 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
             <span>Voice Recording</span>
           </button>
           <button
+            onClick={() => setActiveFormat('text')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+              activeFormat === 'text'
+                ? 'bg-[#6546D7] text-white shadow-sm'
+                : 'text-[#646174] hover:text-[#181622] hover:bg-white'
+            }`}
+          >
+            <PenLine className="w-3.5 h-3.5" />
+            <span>Text Response</span>
+          </button>
+          <button
             onClick={() => setActiveFormat('ai_conversation')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
               activeFormat === 'ai_conversation'
@@ -626,17 +731,6 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>AI Speaking Partner</span>
-          </button>
-          <button
-            onClick={() => setActiveFormat('text')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
-              activeFormat === 'text'
-                ? 'bg-[#6546D7] text-white shadow-sm'
-                : 'text-[#646174] hover:text-[#181622] hover:bg-white'
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Text Preparation</span>
           </button>
         </div>
 
@@ -928,12 +1022,30 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
             {isEvaluating ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Evaluating Rubric...</span>
+                <span>
+                  {activeFormat === 'ai_conversation'
+                    ? 'Evaluating Rubric...'
+                    : 'Submitting Response...'}
+                </span>
               </>
             ) : (
               <>
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Submit for Rubric Evaluation</span>
+                {activeFormat === 'text' ? (
+                  <>
+                    <PenLine className="w-3.5 h-3.5" />
+                    <span>Submit Response for Teacher Review</span>
+                  </>
+                ) : activeFormat === 'recording' ? (
+                  <>
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Submit Recording for Teacher Review</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Submit for AI Rubric Evaluation</span>
+                  </>
+                )}
               </>
             )}
           </button>

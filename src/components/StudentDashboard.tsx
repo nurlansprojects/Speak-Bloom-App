@@ -7,6 +7,7 @@ import {
   getStudentAssessmentAttempts,
 } from '../services/courseService';
 import { getStudentAllSubmissions, formatFileSize } from '../services/uploadStorageService';
+import { getActivityIcon, getActivityFormatLabel } from '../utils/activityUtils';
 import {
   BookOpen,
   ArrowRight,
@@ -24,6 +25,10 @@ import {
   Presentation,
   Download,
   MessageSquare,
+  Clock,
+  PenLine,
+  Mic,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface StudentDashboardProps {
@@ -238,50 +243,78 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         ) : (
           <div className="bg-white rounded-3xl border border-[#ECEAF2] shadow-xs overflow-hidden">
             <div className="divide-y divide-[#ECEAF2]">
-              {recentAttempts.slice(0, 5).map((att) => (
-                <div
-                  key={att.id}
-                  onClick={() => onViewAttempt(att)}
-                  className="p-4 sm:p-5 hover:bg-[#FAF9FC] transition-colors flex items-center justify-between gap-4 cursor-pointer"
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-                        att.passed
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
-                    >
-                      {Math.round(att.overallPercentage)}%
-                    </div>
-                    <div>
-                      <div className="font-bold text-sm text-[#181624]">
-                        {att.format === 'recording'
-                          ? 'Voice Speaking Assessment'
-                          : att.format === 'ai_conversation'
-                          ? 'AI Conversation Practice'
-                          : 'Text-Based Preparation'}
-                      </div>
-                      <p className="text-xs text-[#726E80] line-clamp-1 italic">"{att.content}"</p>
-                    </div>
-                  </div>
+              {recentAttempts.slice(0, 10).map((att) => {
+                const isPending = att.evaluator === 'teacher' && att.status !== 'graded';
 
-                  <div className="text-right shrink-0">
-                    <span
-                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                        att.passed
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-amber-50 text-amber-700'
-                      }`}
-                    >
-                      {att.passed ? 'Passed' : 'Needs Review'}
-                    </span>
-                    <div className="text-[10px] text-[#918E9E] mt-1">
-                      {new Date(att.submittedAt).toLocaleDateString()}
+                return (
+                  <div
+                    key={att.id}
+                    onClick={() => onViewAttempt(att)}
+                    className="p-4 sm:p-5 hover:bg-[#FAF9FC] transition-colors flex items-center justify-between gap-4 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                          isPending
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : att.passed
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}
+                      >
+                        {isPending ? (
+                          <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+                        ) : (
+                          `${Math.round(att.score ?? att.overallPercentage)}%`
+                        )}
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-[#181624] flex items-center gap-1.5">
+                            {getActivityIcon(att.format, 'w-3.5 h-3.5 text-[#6546D7]')}
+                            <span>{getActivityFormatLabel(att.format)}</span>
+                          </span>
+                          {att.activityTitle && (
+                            <span className="text-xs text-[#757186] hidden sm:inline">
+                              • {att.activityTitle}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-[#726E80] line-clamp-1 italic">
+                          "{att.content}"
+                        </p>
+                        {att.teacherComments && (
+                          <p className="text-[11px] text-[#553AC4] font-medium">
+                            ✓ Instructor note: {att.teacherComments}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      {isPending ? (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                          Submitted — Review Pending
+                        </span>
+                      ) : (
+                        <span
+                          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                            att.passed
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}
+                        >
+                          {att.evaluator === 'teacher' ? 'Graded by Teacher' : att.passed ? 'Mastered' : 'Needs Review'}
+                        </span>
+                      )}
+                      <div className="text-[10px] text-[#918E9E] mt-1">
+                        {new Date(att.submittedAt).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

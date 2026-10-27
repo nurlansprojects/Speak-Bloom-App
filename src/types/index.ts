@@ -167,17 +167,30 @@ export interface AssessmentAttempt extends RubricScores {
   studentId: string;
   studentName: string;
   courseId: string;
+  courseTitle?: string;
   lessonId: string;
+  lessonTitle?: string;
   activityId?: string;
+  activityTitle?: string;
   format: ActivityFormat;
   content: string;
   audioData?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
   evaluator: 'ai' | 'teacher';
+  status?: 'submitted' | 'graded';
+  score?: number;
   feedback: string;
   strengths: string[];
   improvements: string[];
   exemplaryRevision?: string;
   teacherComments?: string;
+  teacherId?: string;
+  gradedBy?: string;
+  gradedByName?: string;
+  gradedAt?: string;
   submittedAt: string;
 }
 

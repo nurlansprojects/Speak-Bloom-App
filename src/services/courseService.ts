@@ -643,9 +643,11 @@ export async function submitAssessmentAttempt(
 ): Promise<string> {
   try {
     const attemptRef = doc(collection(db, 'assessmentAttempts'));
+    const isTeacherEvaluated = data.evaluator === 'teacher';
     const newAttempt: AssessmentAttempt = {
       ...data,
       id: attemptRef.id,
+      status: data.status || (isTeacherEvaluated ? 'submitted' : 'graded'),
       submittedAt: new Date().toISOString(),
     };
     await setDoc(attemptRef, newAttempt);
@@ -679,6 +681,56 @@ export async function getCourseSubmissionsForTeacher(courseId: string): Promise<
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as AssessmentAttempt));
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'assessmentAttempts');
+  }
+}
+
+export async function gradeAssessmentAttempt(
+  attemptId: string,
+  score: number,
+  feedback: string,
+  teacherId: string,
+  teacherName: string,
+  masteryThreshold: number = 75
+): Promise<void> {
+  try {
+    const attemptRef = doc(db, 'assessmentAttempts', attemptId);
+    const snap = await getDoc(attemptRef);
+    if (!snap.exists()) {
+      throw new Error('Assessment submission not found');
+    }
+    const currentData = snap.data() as AssessmentAttempt;
+    const passed = score >= masteryThreshold;
+
+    const updates: Partial<AssessmentAttempt> = {
+      status: 'graded',
+      score,
+      overallPercentage: score,
+      passed,
+      feedback: feedback.trim(),
+      teacherComments: feedback.trim(),
+      gradedBy: teacherId,
+      gradedByName: teacherName,
+      gradedAt: new Date().toISOString(),
+    };
+
+    await updateDoc(attemptRef, updates);
+
+    // Update student lesson progression authoritative state
+    if (currentData.studentId && currentData.courseId && currentData.lessonId) {
+      try {
+        await recordLessonAssessment(
+          currentData.studentId,
+          currentData.courseId,
+          currentData.lessonId,
+          score,
+          passed
+        );
+      } catch (progErr) {
+        console.warn('Could not automatically record lesson progress for student:', progErr);
+      }
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `assessmentAttempts/${attemptId}`);
   }
 }
 
