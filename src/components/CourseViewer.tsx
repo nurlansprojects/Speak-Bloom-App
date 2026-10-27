@@ -257,9 +257,11 @@ export const CourseViewer: React.FC<CourseViewerProps> = ({
 
                                     <div>
                                       <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-[#FAF9FC] border border-[#E9E7F1] text-[#555263]">
-                                          {lesson.bloomLevels?.[0] || 'Apply'}
-                                        </span>
+                                        {lesson.bloomLevels && lesson.bloomLevels.length > 0 && (
+                                          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-[#FAF9FC] border border-[#E9E7F1] text-[#555263]">
+                                            {lesson.bloomLevels[0]}
+                                          </span>
+                                        )}
                                         {isCompleted && (
                                           <span className="text-[10px] font-bold text-emerald-600">
                                             Score: {prog?.bestScore}%

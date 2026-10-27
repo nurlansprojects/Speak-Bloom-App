@@ -101,7 +101,7 @@ export interface Lesson {
   description: string;
   targetSpeakingOutcome: string;
   cefrLevel: CEFRLevel;
-  bloomLevels: BloomLevel[];
+  bloomLevels?: BloomLevel[];
   orderIndex: number;
   requiredMasteryScore: number;
   explanation: string;
