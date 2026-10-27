@@ -38,7 +38,7 @@ export const AssessmentResultModal: React.FC<AssessmentResultModalProps> = ({
 
   const criteria = [
     { name: 'Fluency', score: attempt.scoreFluency, desc: 'Smoothness, rhythm, and natural pacing' },
-    { name: 'Vocabulary', score: attempt.scoreVocabulary, desc: 'Range and precision of CEFR vocabulary' },
+    { name: 'Vocabulary', score: attempt.scoreVocabulary, desc: 'Range and precision of spoken vocabulary' },
     { name: 'Grammar', score: attempt.scoreGrammar, desc: 'Sentence structures and grammatical accuracy' },
     { name: 'Pronunciation', score: attempt.scorePronunciation, desc: 'Clarity, word stress, and intelligibility' },
     { name: 'Coherence', score: attempt.scoreCoherence, desc: 'Logical flow and linking expressions' },

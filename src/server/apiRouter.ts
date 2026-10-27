@@ -170,7 +170,7 @@ router.post('/ai/chat', async (req, res) => {
     const result = await generateSpeakingPartnerResponse(
       message,
       Array.isArray(history) ? history : [],
-      lessonContext || { title: 'English Conversation', cefrLevel: 'B1' }
+      lessonContext || { title: 'English Conversation' }
     );
 
     res.json({
@@ -228,7 +228,7 @@ router.post('/ai/assess', async (req, res) => {
 
     const evaluation = await evaluateSpeakingSubmission(
       textToEvaluate,
-      lessonContext || { title: 'Speaking Assessment', cefrLevel: 'B1' },
+      lessonContext || { title: 'Speaking Assessment' },
       Number(masteryThreshold) || 75
     );
 

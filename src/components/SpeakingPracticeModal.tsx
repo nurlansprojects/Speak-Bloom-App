@@ -120,7 +120,6 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
         lessonContext: {
           title: lesson.title,
           targetOutcome: lesson.targetSpeakingOutcome,
-          cefrLevel: lesson.cefrLevel,
           bloomLevel: activity.bloomLevel,
           prompt: activity.prompt,
         },
@@ -163,7 +162,6 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
         lessonContext: {
           title: lesson.title,
           targetOutcome: lesson.targetSpeakingOutcome,
-          cefrLevel: lesson.cefrLevel,
           bloomLevel: activity.bloomLevel,
           prompt: activity.prompt,
         },
@@ -601,7 +599,6 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
             lessonContext: {
               title: lesson.title,
               targetOutcome: lesson.targetSpeakingOutcome,
-              cefrLevel: lesson.cefrLevel,
               bloomLevel: activity.bloomLevel,
               prompt: activity.prompt,
               expectedResponse: activity.expectedResponse,
@@ -681,9 +678,6 @@ export const SpeakingPracticeModal: React.FC<SpeakingPracticeModalProps> = ({
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#F1EEFB] text-[#6546D7]">
                 Bloom: {activity.bloomLevel}
-              </span>
-              <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#F3F2F7] text-[#555265]">
-                CEFR: {lesson.cefrLevel}
               </span>
             </div>
             <h3 className="text-base sm:text-lg font-bold text-[#16151E]">{activity.title}</h3>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Course, CEFRLevel, Enrollment } from '../types';
+import { Course, Enrollment } from '../types';
 import {
   getPublishedCourses,
   getStudentEnrollments,
@@ -13,13 +13,10 @@ interface CourseCatalogProps {
   onSelectCourse: (course: Course) => void;
 }
 
-const CEFR_LEVELS: (CEFRLevel | 'ALL')[] = ['ALL', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-
 export const CourseCatalog: React.FC<CourseCatalogProps> = ({ onSelectCourse }) => {
   const { currentUser } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Record<string, Enrollment>>({});
-  const [selectedCefr, setSelectedCefr] = useState<CEFRLevel | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
@@ -81,11 +78,10 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({ onSelectCourse }) 
   };
 
   const filteredCourses = courses.filter((c) => {
-    const matchesCefr = selectedCefr === 'ALL' || c.cefrLevel === selectedCefr;
-    const matchesSearch =
+    return (
       c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCefr && matchesSearch;
+      c.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   });
 
   return (
@@ -97,7 +93,7 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({ onSelectCourse }) 
             Course Catalog
           </h1>
           <p className="text-sm text-[#5B586B] mt-1">
-            Structured English-speaking courses organized by CEFR levels and Bloom's Taxonomy.
+            Structured English-speaking courses aligned with Bloom's Taxonomy.
           </p>
         </div>
 
@@ -114,23 +110,6 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({ onSelectCourse }) 
         </div>
       </div>
 
-      {/* CEFR Level Filter Chips */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-        {CEFR_LEVELS.map((level) => (
-          <button
-            key={level}
-            onClick={() => setSelectedCefr(level)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-              selectedCefr === level
-                ? 'bg-[#6546D7] text-white shadow-xs'
-                : 'bg-white text-[#5F5C6E] hover:bg-[#F2EFFC] border border-[#ECEAF2]'
-            }`}
-          >
-            {level === 'ALL' ? 'All Levels' : `CEFR ${level}`}
-          </button>
-        ))}
-      </div>
-
       {/* Course Grid */}
       {loading ? (
         <div className="py-16 flex justify-center">
@@ -144,8 +123,8 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({ onSelectCourse }) 
           <h3 className="text-base font-bold text-[#16151E]">No courses found</h3>
           <p className="text-xs text-[#716D80] max-w-sm mx-auto leading-relaxed">
             {courses.length === 0
-              ? 'No courses have been published yet by teachers. You can create a new course in the Teaching Studio or load our sample B2 curriculum featuring Uploading activities!'
-              : 'No courses match your selected CEFR level or search criteria.'}
+              ? 'No courses have been published yet by teachers. You can create a new course in the Teaching Studio or load our sample curriculum featuring Uploading activities!'
+              : 'No courses match your search criteria.'}
           </p>
 
           {courses.length === 0 && (
@@ -175,7 +154,7 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({ onSelectCourse }) 
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-[#F1EEFB] text-[#6546D7]">
-                      CEFR {course.cefrLevel}
+                      Spoken English
                     </span>
                     <span className="text-xs text-[#807D90]">
                       By {course.teacherName}

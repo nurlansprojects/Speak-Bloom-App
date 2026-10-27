@@ -117,7 +117,7 @@ export const CourseViewer: React.FC<CourseViewerProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-[#F1EEFB] text-[#6546D7]">
-              CEFR {course.cefrLevel}
+              Spoken Curriculum
             </span>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#FAF9FC] border border-[#ECEAF2] text-[#555263]">
               Instructor: {course.teacherName}

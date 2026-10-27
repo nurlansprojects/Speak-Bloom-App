@@ -829,8 +829,7 @@ export async function seedSampleCourseWithUploading(
       teacherName: teacherName || 'Prof. Sarah Vance',
       title: 'Professional English & Executive Presentations',
       description:
-        'Master formal business discourse, strategic presentations, and professional pitches aligned with CEFR B2 outcomes and Bloom Taxonomy.',
-      cefrLevel: 'B2',
+        'Master formal business discourse, strategic presentations, and professional pitches aligned with Bloom\'s Taxonomy.',
       targetAudience: 'Professionals, business leaders, and advanced English learners.',
       learningOutcomes:
         'Deliver structured persuasive presentations, defend quarterly strategy with precision vocabulary, and prepare executive pitch decks.',
@@ -880,7 +879,6 @@ export async function seedSampleCourseWithUploading(
       description: 'Apply the Rule of Three and rhetorical signposting in business presentations.',
       targetSpeakingOutcome:
         'Deliver a confident 3-minute executive pitch using signposting language and supporting presentation slides.',
-      cefrLevel: 'B2',
       bloomLevels: ['Create', 'Apply', 'Evaluate'],
       orderIndex: 1,
       requiredMasteryScore: 75,
@@ -905,7 +903,6 @@ export async function seedSampleCourseWithUploading(
       instructions:
         'Select and upload your presentation materials. You may submit your slide deck (PPT, PPTX, or PDF), video presentation (MP4), audio rehearsal (MP3), or supporting financial model (XLS, XLSX). Your instructor will evaluate your submission with rubric-based feedback.',
       bloomLevel: 'Create',
-      cefrLevel: 'B2',
       format: 'uploading',
       prompt:
         'Upload your executive presentation deck (PPTX/PDF) or recorded pitch (MP4/MP3) showcasing structured rhetorical signposts and high-impact vocabulary.',
@@ -924,7 +921,6 @@ export async function seedSampleCourseWithUploading(
       title: 'Executive Summary Spoken Rehearsal',
       instructions: 'Record your 60-second opening statement using at least two key signposts.',
       bloomLevel: 'Apply',
-      cefrLevel: 'B2',
       format: 'recording',
       prompt:
         'Speak for 60 seconds delivering your presentation introduction. Incorporate "First and foremost" and "To substantiate this claim...".',

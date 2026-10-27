@@ -103,9 +103,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-[#F1EEFB] text-[#6546D7]">
-              CEFR Goal: {userProfile?.cefrGoal || 'B1'}
+              Speaking Fluency Journey
             </span>
-            <span className="text-xs text-[#7B788B]">English Speaking Journey</span>
+            <span className="text-xs text-[#7B788B]">Active Learner</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16151E]">
             Welcome back, {userProfile?.displayName}
@@ -162,7 +162,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             <div className="max-w-md mx-auto space-y-1">
               <h3 className="text-base font-bold text-[#171523]">No active enrollments yet</h3>
               <p className="text-xs text-[#6F6B7E] leading-relaxed">
-                Explore published courses aligned to your CEFR proficiency level and begin your speaking lessons.
+                Explore published courses aligned with Bloom's Taxonomy and begin your speaking lessons.
               </p>
             </div>
             <button
@@ -188,7 +188,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-3">
                       <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#F1EEFB] text-[#6546D7]">
-                        CEFR {course.cefrLevel}
+                        Spoken English
                       </span>
                       <span className="text-xs text-[#7B788C]">
                         Teacher: {course.teacherName}

@@ -6,7 +6,6 @@ import {
   Topic,
   Lesson,
   Activity,
-  CEFRLevel,
   BloomLevel,
   ActivityFormat,
 } from '../types';
@@ -53,8 +52,6 @@ const BLOOM_LEVELS: BloomLevel[] = [
   'Create',
 ];
 
-const CEFR_LEVELS: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-
 export const CourseBuilder: React.FC<CourseBuilderProps> = ({
   existingCourse,
   onBack,
@@ -66,7 +63,6 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
   const [courseId, setCourseId] = useState<string | null>(existingCourse?.id || null);
   const [title, setTitle] = useState(existingCourse?.title || '');
   const [description, setDescription] = useState(existingCourse?.description || '');
-  const [cefrLevel, setCefrLevel] = useState<CEFRLevel>(existingCourse?.cefrLevel || 'B1');
   const [targetAudience, setTargetAudience] = useState(existingCourse?.targetAudience || '');
   const [learningOutcomes, setLearningOutcomes] = useState(existingCourse?.learningOutcomes || '');
   const [masteryThreshold, setMasteryThreshold] = useState<number>(
@@ -190,7 +186,6 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
           teacherName: userProfile.displayName || 'Instructor',
           title: title.trim(),
           description: description.trim(),
-          cefrLevel,
           targetAudience: targetAudience.trim(),
           learningOutcomes: learningOutcomes.trim(),
           status: newStatus,
@@ -201,7 +196,6 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
         await updateCourse(activeCid, {
           title: title.trim(),
           description: description.trim(),
-          cefrLevel,
           targetAudience: targetAudience.trim(),
           learningOutcomes: learningOutcomes.trim(),
           status: newStatus,
@@ -300,7 +294,6 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
           title: lessonTitle.trim(),
           description: lessonOutcome.trim(),
           targetSpeakingOutcome: lessonOutcome.trim(),
-          cefrLevel,
           ...(editingLessonLegacyBloom && editingLessonLegacyBloom.length > 0
             ? { bloomLevels: editingLessonLegacyBloom }
             : {}),
@@ -318,7 +311,6 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
           title: lessonTitle.trim(),
           description: lessonOutcome.trim(),
           targetSpeakingOutcome: lessonOutcome.trim(),
-          cefrLevel,
           orderIndex: lessons.length + 1,
           requiredMasteryScore: lessonMasteryScore,
           explanation: lessonExplanation.trim(),
@@ -361,7 +353,6 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
       title: activityTitle.trim(),
       instructions: activityInstructions.trim(),
       bloomLevel: activityBloom,
-      cefrLevel,
       format: activityFormat,
       prompt: activityPrompt.trim(),
       maxAttempts: 3,
@@ -477,21 +468,6 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#322F40]">Target CEFR Level *</label>
-            <select
-              value={cefrLevel}
-              onChange={(e) => setCefrLevel(e.target.value as CEFRLevel)}
-              className="w-full px-4 py-2.5 rounded-xl border border-[#DCD9E8] bg-white text-xs sm:text-sm focus:outline-none focus:border-[#6546D7]"
-            >
-              {CEFR_LEVELS.map((lvl) => (
-                <option key={lvl} value={lvl}>
-                  CEFR {lvl}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[#322F40]">
               Mastery Threshold (%) *
             </label>
@@ -516,7 +492,7 @@ export const CourseBuilder: React.FC<CourseBuilderProps> = ({
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="sm:col-span-2 space-y-1.5">
             <label className="text-xs font-semibold text-[#322F40]">Learning Outcomes *</label>
             <input
               type="text"

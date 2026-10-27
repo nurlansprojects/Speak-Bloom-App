@@ -323,17 +323,20 @@ export const LessonStudyView: React.FC<LessonStudyViewProps> = ({
       {/* Lesson Header Card */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#ECEAF2] shadow-xs">
         <div className="flex flex-wrap items-center gap-2 mb-3">
-          <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-[#F1EEFB] text-[#6546D7]">
-            CEFR {lesson.cefrLevel}
-          </span>
-          {lesson.bloomLevels?.map((lvl) => (
-            <span
-              key={lvl}
-              className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#FAF9FC] border border-[#ECEAF2] text-[#474457]"
-            >
-              Bloom: {lvl}
+          {lesson.bloomLevels && lesson.bloomLevels.length > 0 ? (
+            lesson.bloomLevels.map((lvl) => (
+              <span
+                key={lvl}
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#FAF9FC] border border-[#ECEAF2] text-[#474457]"
+              >
+                Bloom: {lvl}
+              </span>
+            ))
+          ) : (
+            <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-[#F1EEFB] text-[#6546D7]">
+              Speaking Lesson
             </span>
-          ))}
+          )}
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16151E] mb-3">

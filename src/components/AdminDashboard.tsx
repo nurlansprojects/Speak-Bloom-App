@@ -313,7 +313,7 @@ export const AdminDashboard: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#F1EEFB] text-[#6546D7]">
-                        CEFR {c.cefrLevel}
+                        Spoken English
                       </span>
                       <span
                         className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${

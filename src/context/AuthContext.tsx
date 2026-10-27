@@ -59,7 +59,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           displayName: user.displayName || 'Learner',
           photoURL: user.photoURL || null,
           role: initialRole,
-          cefrGoal: 'B1',
           createdAt: new Date().toISOString(),
         };
 

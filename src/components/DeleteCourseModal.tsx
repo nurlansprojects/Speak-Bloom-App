@@ -89,8 +89,6 @@ export const DeleteCourseModal: React.FC<DeleteCourseModalProps> = ({
             </div>
             <div className="text-sm font-bold text-[#181624]">{course.title}</div>
             <div className="text-[#6D6A7C] flex items-center gap-3 text-[11px] pt-1">
-              <span>CEFR {course.cefrLevel}</span>
-              <span>•</span>
               <span>{course.modulesCount || 0} Modules</span>
               <span>•</span>
               <span>Instructor: {course.teacherName}</span>

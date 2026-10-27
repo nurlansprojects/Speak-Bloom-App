@@ -22,7 +22,6 @@ export interface ChatMessage {
 export interface LessonContext {
   title: string;
   targetOutcome?: string;
-  cefrLevel: string;
   bloomLevel?: string;
   prompt?: string;
   expectedResponse?: string;
@@ -41,16 +40,12 @@ export async function generateSpeakingPartnerResponse(
   }
 
   const systemInstruction = `You are Bloom, an encouraging, native-level English speaking partner and coach for Speak Bloom.
-Target CEFR Level: ${context.cefrLevel || 'B1'}
 Current Bloom's Taxonomy Level: ${context.bloomLevel || 'Apply'}
 Lesson Topic: "${context.title}"
 Speaking Outcome: "${context.targetOutcome || 'Develop natural speaking fluency'}"
 
 Guidelines:
-1. Speak in natural, level-appropriate English matching CEFR ${context.cefrLevel}.
-   - For A1/A2: Use simple sentences, common vocabulary, clear and brief questions.
-   - For B1/B2: Engage with compound sentences, everyday idioms, and conversational prompts.
-   - For C1/C2: Challenge the student with nuanced, analytical, and spontaneous discussion.
+1. Speak in natural, clear, and engaging conversational English.
 2. Align your conversational objective with Bloom's Taxonomy:
    - Remember: Prompt student to recall and name key vocabulary/phrases.
    - Understand: Ask student to explain meanings or summarize ideas in their own words.
@@ -158,7 +153,7 @@ function generateFallbackEvaluation(
     feedback: `Good speaking performance on "${context.title}". Your ideas are conveyed with clear communicative purpose.`,
     strengths: [
       'Directly responded to the prompt with relevant context',
-      'Intelligible vocabulary choices suitable for CEFR level',
+      'Intelligible vocabulary choices suitable for conversational speaking',
     ],
     improvements: [
       'Practice longer continuous phrasing without pauses',
@@ -185,7 +180,7 @@ export async function evaluateSpeakingSubmission(
   }
 
   const prompt = `You are the lead English speaking examiner for Speak Bloom.
-Evaluate the following spoken response according to the 6-criterion Bloom Rubric for CEFR ${context.cefrLevel || 'B1'}.
+Evaluate the following spoken response according to the 6-criterion Bloom Rubric.
 Lesson: "${context.title}"
 Prompt: "${context.prompt || 'Speaking activity'}"
 Target Mastery Threshold: ${targetMasteryScore}%

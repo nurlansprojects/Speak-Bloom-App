@@ -445,7 +445,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </div>
             <h3 className="text-base font-bold text-[#16151E]">You have not created any courses yet</h3>
             <p className="text-xs text-[#716E80] max-w-sm mx-auto leading-relaxed">
-              Design a structured curriculum incorporating CEFR levels and Bloom's six cognitive domains.
+              Design a structured spoken English curriculum incorporating Bloom's six cognitive domains.
             </p>
             <button
               onClick={onCreateCourse}
@@ -465,7 +465,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#F1EEFB] text-[#6546D7]">
-                      CEFR {course.cefrLevel}
+                      Spoken Course
                     </span>
                     <span
                       className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${

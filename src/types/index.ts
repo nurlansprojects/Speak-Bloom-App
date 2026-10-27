@@ -1,7 +1,5 @@
 export type UserRole = 'student' | 'teacher' | 'admin';
 
-export type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
-
 export type BloomLevel =
   | 'Remember'
   | 'Understand'
@@ -50,7 +48,6 @@ export interface UserProfile {
   displayName: string;
   photoURL: string | null;
   role: UserRole;
-  cefrGoal: CEFRLevel;
   createdAt: string;
   updatedAt?: string;
 }
@@ -61,7 +58,6 @@ export interface Course {
   teacherName: string;
   title: string;
   description: string;
-  cefrLevel: CEFRLevel;
   targetAudience: string;
   learningOutcomes: string;
   prerequisites?: string;
@@ -100,7 +96,6 @@ export interface Lesson {
   title: string;
   description: string;
   targetSpeakingOutcome: string;
-  cefrLevel: CEFRLevel;
   bloomLevels?: BloomLevel[];
   orderIndex: number;
   requiredMasteryScore: number;
@@ -118,7 +113,6 @@ export interface Activity {
   title: string;
   instructions: string;
   bloomLevel: BloomLevel;
-  cefrLevel: CEFRLevel;
   format: ActivityFormat;
   prompt: string;
   expectedResponse?: string;
