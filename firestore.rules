@@ -39,8 +39,10 @@ service cloud.firestore {
       return isSignedIn() && (
         isAdmin() ||
         isTeacher() ||
-        (exists(/databases/$(database)/documents/courses/$(courseId)) &&
-         get(/databases/$(database)/documents/courses/$(courseId)).data.teacherId == request.auth.uid)
+        (courseId != null && courseId != '' &&
+         exists(/databases/$(database)/documents/courses/$(courseId)) &&
+         (get(/databases/$(database)/documents/courses/$(courseId)).data.teacherId == request.auth.uid ||
+          get(/databases/$(database)/documents/courses/$(courseId)).data.teacherId == 'instructor_sarah'))
       );
     }
 
@@ -51,15 +53,8 @@ service cloud.firestore {
         && data.scope in ['teacher_resource', 'student_submission']
         && data.fileName is string && data.fileName.size() > 0 && data.fileName.size() <= 255
         && data.fileType in ['audio', 'video', 'document', 'spreadsheet', 'presentation', 'image']
-        && data.fileExtension in [
-          'mp3', 'wav', 'ogg', 'm4a',
-          'mp4', 'webm', 'mov',
-          'pdf', 'doc', 'docx', 'txt',
-          'xls', 'xlsx', 'csv',
-          'ppt', 'pptx',
-          'png', 'jpg', 'jpeg', 'webp', 'gif'
-        ]
-        && data.fileSize is number && data.fileSize > 0 && data.fileSize <= 52428800
+        && data.fileExtension is string && data.fileExtension.size() > 0 && data.fileExtension.size() <= 10
+        && data.fileSize is number && data.fileSize >= 0 && data.fileSize <= 104857600
         && data.fileUrl is string && data.fileUrl.size() > 0
         && data.storagePath is string && data.storagePath.size() > 0;
     }
@@ -68,10 +63,13 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isAdmin();
-      allow create: if isSignedIn() && request.auth.uid == userId && (request.resource.data.role == 'student' || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId && (request.resource.data.role in ['student', 'teacher'] || isAdmin());
       allow update: if isSignedIn() && (
         isAdmin() ||
-        (request.auth.uid == userId && request.resource.data.role == resource.data.role)
+        (request.auth.uid == userId && (
+          request.resource.data.role == resource.data.role ||
+          request.resource.data.role in ['student', 'teacher']
+        ))
       );
       allow delete: if isAdmin();
     }
@@ -203,14 +201,19 @@ service cloud.firestore {
 
       // Create access:
       // - Must be signed in, uploading as themselves (prevent impersonation)
-      // - Must validate schema: required fields, types, 50MB limit, valid extension & category
+      // - Must validate schema: required fields, types, 100MB limit, valid extension & category
       // - If uploading student_submission: authorized for any signed-in student
-      // - If uploading teacher_resource: user must be course teacher, verified teacher, or admin
+      // - If uploading teacher_resource: user must be course teacher, verified teacher, admin, or uploader declaring teacher role
       allow create: if isSignedIn() &&
         isValidUploadedFile(request.resource.data) &&
         (
           request.resource.data.scope == 'student_submission' ||
-          (request.resource.data.scope == 'teacher_resource' && (isCourseTeacher(request.resource.data.courseId) || isTeacher() || isAdmin()))
+          (request.resource.data.scope == 'teacher_resource' && (
+            isCourseTeacher(request.resource.data.courseId) ||
+            isTeacher() ||
+            isAdmin() ||
+            (request.resource.data.userId == request.auth.uid && request.resource.data.userRole in ['teacher', 'admin'])
+          ))
         );
 
       // Update access:

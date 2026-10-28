@@ -10,6 +10,7 @@ import {
   getTeacherUploadsForLesson,
   ALL_ALLOWED_EXTENSIONS,
   UploadState,
+  formatUploadErrorMessage,
 } from '../services/uploadStorageService';
 import {
   UploadCloud,
@@ -183,7 +184,7 @@ export const LessonUploadingSection: React.FC<LessonUploadingSectionProps> = ({
           setStatusMessage('Upload cancelled by user.');
         } else {
           setUploadState('error');
-          setErrorMessage(err.message || 'Failed to complete uploading.');
+          setErrorMessage(formatUploadErrorMessage(err));
         }
         return;
       }
@@ -197,7 +198,7 @@ export const LessonUploadingSection: React.FC<LessonUploadingSectionProps> = ({
       const newRecord = await createUploadRecord({
         userId: currentUser.uid,
         userName: userProfile.displayName || 'Instructor',
-        userRole: userProfile.role || 'teacher',
+        userRole: isTeacher ? 'teacher' : (userProfile.role || 'teacher'),
         courseId: course.id,
         lessonId: lesson.id,
         scope: 'teacher_resource',
@@ -230,7 +231,8 @@ export const LessonUploadingSection: React.FC<LessonUploadingSectionProps> = ({
       }, 700);
     } catch (err: any) {
       setUploadState('error');
-      setErrorMessage(`Storage uploaded, but saving to database failed: ${err.message || 'Database error'}. Click Retry to save without re-uploading.`);
+      const friendlyErr = formatUploadErrorMessage(err);
+      setErrorMessage(`Storage uploaded, but saving to database failed: ${friendlyErr}. Click Retry to save without re-uploading.`);
     }
   };
 

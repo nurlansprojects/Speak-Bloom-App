@@ -26,22 +26,55 @@ export interface FileValidationResult {
 
 // Supported file format mappings
 export const SUPPORTED_EXTENSIONS = {
-  audio: ['mp3', 'wav', 'ogg', 'm4a'],
-  video: ['mp4', 'webm', 'mov'],
-  document: ['pdf', 'doc', 'docx', 'txt'],
-  spreadsheet: ['xls', 'xlsx', 'csv'],
+  audio: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'],
+  video: ['mp4', 'webm', 'mov', 'mkv', 'avi'],
+  document: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'],
+  spreadsheet: ['xls', 'xlsx', 'csv', 'ods'],
   presentation: ['ppt', 'pptx'],
-  image: ['png', 'jpg', 'jpeg', 'webp', 'gif'],
+  image: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'],
 };
 
 export const ALL_ALLOWED_EXTENSIONS = [
   'ppt', 'pptx',
-  'pdf', 'doc', 'docx', 'txt',
-  'xls', 'xlsx', 'csv',
-  'mp3', 'wav', 'ogg', 'm4a',
-  'mp4', 'webm', 'mov',
-  'png', 'jpg', 'jpeg', 'webp', 'gif'
+  'pdf', 'doc', 'docx', 'txt', 'rtf', 'odt',
+  'xls', 'xlsx', 'csv', 'ods',
+  'mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac',
+  'mp4', 'webm', 'mov', 'mkv', 'avi',
+  'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'
 ];
+
+/**
+ * Format any raw error or JSON firestore error into user-friendly guidance
+ */
+export function formatUploadErrorMessage(err: unknown): string {
+  if (!err) return 'An unknown error occurred during uploading.';
+  const rawMsg = err instanceof Error ? err.message : String(err);
+
+  // Check if this is a stringified FirestoreErrorInfo object
+  try {
+    if (rawMsg.startsWith('{') && rawMsg.endsWith('}')) {
+      const parsed = JSON.parse(rawMsg);
+      if (parsed.error && typeof parsed.error === 'string') {
+        if (parsed.error.includes('Missing or insufficient permissions')) {
+          return 'Permission denied: Your account is not authorized to create or modify uploads in this course. Please make sure you are signed in as an authorized teacher.';
+        }
+        return `Database error: ${parsed.error}`;
+      }
+    }
+  } catch {
+    // Not a JSON object, proceed to regex checks
+  }
+
+  if (rawMsg.includes('Missing or insufficient permissions') || rawMsg.includes('permission-denied')) {
+    return 'Permission denied: Insufficient database privileges. Please verify your teacher permissions or re-sign in.';
+  }
+
+  if (rawMsg.includes('offline') || rawMsg.includes('network') || rawMsg.includes('Failed to fetch')) {
+    return 'Network connection issue. Your file was saved to storage, but could not record to the database. Click Retry to complete.';
+  }
+
+  return rawMsg;
+}
 
 /**
  * Validate selected file format against supported types
@@ -55,7 +88,7 @@ export function validateUploadedFile(file: File, allowedList?: string[]): FileVa
     };
   }
 
-  const ext = parts.pop()!.toLowerCase();
+  const ext = parts.pop()!.toLowerCase().trim();
   const allowed = allowedList && allowedList.length > 0 ? allowedList : ALL_ALLOWED_EXTENSIONS;
 
   if (!allowed.includes(ext)) {
@@ -80,12 +113,12 @@ export function validateUploadedFile(file: File, allowedList?: string[]): FileVa
     category = 'spreadsheet';
   }
 
-  // Maximum file size limit: 50MB
-  const maxBytes = 50 * 1024 * 1024;
+  // Maximum file size limit: 100MB
+  const maxBytes = 100 * 1024 * 1024;
   if (file.size > maxBytes) {
     return {
       valid: false,
-      error: `File size exceeds the 50MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please choose a smaller file.`,
+      error: `File size exceeds the 100MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please choose a file under 100MB.`,
     };
   }
 
@@ -347,20 +380,23 @@ export async function uploadFileToStorage(
       });
     }
 
-    uploadTask.on('state_changed', (snapshot) => {
-      if (snapshot.totalBytes > 0) {
-        const percent = Math.min(99, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
-        onProgress?.(percent, snapshot.bytesTransferred, snapshot.totalBytes);
-        onStateChange?.('uploading', `Uploading... ${percent}%`);
-      }
-    });
-
     const directUploadPromise = new Promise<{ fileUrl: string; storagePath: string }>(
       (resolve, reject) => {
-        uploadTask.then(
-          async (snapshot) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            if (snapshot.totalBytes > 0) {
+              const percent = Math.min(99, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+              onProgress?.(percent, snapshot.bytesTransferred, snapshot.totalBytes);
+              onStateChange?.('uploading', `Uploading... ${percent}%`);
+            }
+          },
+          (taskError) => {
+            reject(taskError);
+          },
+          async () => {
             try {
-              const downloadUrl = await getDownloadURL(snapshot.ref);
+              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
               onProgress?.(100, file.size, file.size);
               onStateChange?.('processing', 'File uploaded. Verifying storage...');
               resolve({
@@ -370,15 +406,14 @@ export async function uploadFileToStorage(
             } catch (urlErr) {
               reject(urlErr);
             }
-          },
-          (err) => reject(err)
+          }
         );
       }
     );
 
-    // Timeout guard of 15 seconds for Firebase Storage direct upload
+    // Timeout guard of 6 seconds for Firebase Storage direct upload before seamless server fallback
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Firebase Storage upload timeout')), 15000)
+      setTimeout(() => reject(new Error('Firebase Storage upload timeout')), 6000)
     );
 
     return await Promise.race([directUploadPromise, timeoutPromise]);
@@ -399,9 +434,11 @@ export async function createUploadRecord(
     const uploadRef = existingId ? doc(db, 'uploads', existingId) : doc(collection(db, 'uploads'));
     const docId = uploadRef.id;
     const now = new Date().toISOString();
+    const sanitizedExt = (data.fileExtension || '').replace(/^\./, '').toLowerCase().trim();
 
     const rawRecord: Record<string, any> = {
       ...data,
+      fileExtension: sanitizedExt,
       id: docId,
       studentId: data.userId,
       assignmentId: data.activityId || '',

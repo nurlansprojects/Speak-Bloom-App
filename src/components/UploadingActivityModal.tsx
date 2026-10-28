@@ -12,6 +12,7 @@ import {
   getTeacherUploadsForLesson,
   teacherReviewSubmission,
   ALL_ALLOWED_EXTENSIONS,
+  formatUploadErrorMessage,
 } from '../services/uploadStorageService';
 import {
   UploadCloud,
@@ -344,7 +345,7 @@ export const UploadingActivityModal: React.FC<UploadingActivityModalProps> = ({
                   ? {
                       ...i,
                       status: 'error',
-                      errorMessage: uploadErr.message || 'Uploading failed. You can retry this upload.',
+                      errorMessage: formatUploadErrorMessage(uploadErr),
                     }
                   : i
               )
@@ -370,7 +371,7 @@ export const UploadingActivityModal: React.FC<UploadingActivityModalProps> = ({
         const record = await createUploadRecord({
           userId: currentUser.uid,
           userName: userProfile.displayName || 'Speak Bloom User',
-          userRole: userProfile.role || 'student',
+          userRole: isTeacher ? 'teacher' : (userProfile.role || 'student'),
           courseId: course.id,
           lessonId: lesson.id,
           activityId: activity.id,
@@ -411,13 +412,14 @@ export const UploadingActivityModal: React.FC<UploadingActivityModalProps> = ({
         }
       } catch (dbErr: any) {
         console.error('Database record creation failed:', dbErr);
+        const friendlyMsg = formatUploadErrorMessage(dbErr);
         setUploadQueue((prev) =>
           prev.map((i) =>
             i.id === item.id
               ? {
                   ...i,
                   status: 'error',
-                  errorMessage: `File uploaded to storage, but database save failed: ${dbErr.message || 'Database error'}. Click Retry to save without re-uploading.`,
+                  errorMessage: `File uploaded to storage, but database save failed: ${friendlyMsg}. Click Retry to save without re-uploading.`,
                 }
               : i
           )

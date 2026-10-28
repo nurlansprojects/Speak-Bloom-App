@@ -105,6 +105,12 @@ router.get('/storage/files/:filename', (req, res) => {
       });
     }
 
+    const originalName = typeof req.query.name === 'string' ? path.basename(req.query.name) : safeFilename;
+    const isDownload = req.query.download === '1' || req.query.download === 'true';
+    const disposition = isDownload ? 'attachment' : 'inline';
+
+    res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(originalName)}"`);
+
     res.sendFile(filePath, {
       acceptRanges: true,
       headers: {
